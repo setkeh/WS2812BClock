@@ -1,0 +1,10 @@
+menu "WS2812B Clock Fans"
+
+    config FAN1_PWM_GPIO
+        int "PWM Port"
+        range 0 39
+        default 25
+        help
+            GPIO Pin for fan 1
+
+endmenu
