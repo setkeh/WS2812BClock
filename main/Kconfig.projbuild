@@ -1,0 +1,18 @@
+menu "WS2812B Clock"
+
+    config BLINK_GPIO
+        int "Blink GPIO number"
+        range 0 39
+        default 2
+        help
+            GPIO driving the status LED. Most generic ESP32 devkits
+            (DOIT DevKit V1 and clones) have the onboard LED on GPIO2.
+
+    config BLINK_PERIOD_MS
+        int "Blink period (ms)"
+        range 10 3600000
+        default 1000
+        help
+            Time the LED spends in each state.
+
+endmenu
