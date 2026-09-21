@@ -34,6 +34,7 @@
           packages = [
             espPkgs.esp-idf-full
             pkgs.fish
+            pkgs.gh
           ];
         };
       }
