@@ -7,6 +7,9 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+
+#include "wifi.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -30,31 +33,46 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+#define WIFI_RETRY_BACKOFF_US (120 * 1000000ULL)
+
 static const char *TAG = "wifi station";
 
+static esp_timer_handle_t s_retry_timer;
 static int s_retry_num = 0;
+
+static void retry_timer_cb(void *arg) {
+    s_retry_num = 0;
+    esp_wifi_connect();          // kicks off a fresh round of 5 attempts
+}
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         if (s_retry_num < WIFI_MAXIMUM_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+            ESP_LOGW(TAG, "giving up, next round in 120 s");
+            esp_err_t err = esp_timer_start_once(s_retry_timer, WIFI_RETRY_BACKOFF_US);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "retry timer failed: %s", esp_err_to_name(err));
+            }
         }
         ESP_LOGI(TAG,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        xEventGroupClearBits(s_wifi_event_group, WIFI_FAIL_BIT);
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-void wifi_init_sta(void)
+bool wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
 
@@ -90,6 +108,10 @@ void wifi_init_sta(void)
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    
+    const esp_timer_create_args_t targs = { .callback = retry_timer_cb, .name = "wifi_retry" };
+    ESP_ERROR_CHECK(esp_timer_create(&targs, &s_retry_timer));
+
     ESP_ERROR_CHECK(esp_wifi_start() );
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
@@ -119,4 +141,6 @@ void wifi_init_sta(void)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+
+    return (bits & WIFI_CONNECTED_BIT) != 0;
 }

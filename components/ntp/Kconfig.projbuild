@@ -1,0 +1,27 @@
+menu "WS2812B Clock NTP"
+
+    config SNTP_TIME_SERVER
+        string "SNTP server name"
+        default "pool.ntp.org"
+        help
+            Hostname of the main SNTP server.
+
+    config NTP_TZ
+        string "SNTP Configured TimeZone"
+        default "AEST-10AEDT,M10.1.0,M4.1.0/3"
+        help
+            The time zone to set to.
+
+    choice SNTP_TIME_SYNC_METHOD
+        prompt "Time synchronization method"
+        default SNTP_TIME_SYNC_METHOD_IMMED
+        help
+            Time synchronization method.
+
+        config SNTP_TIME_SYNC_METHOD_IMMED
+            bool "update time immediately when received"
+        config SNTP_TIME_SYNC_METHOD_SMOOTH
+            bool "update time with smooth method (adjtime)"
+    endchoice
+
+endmenu
