@@ -73,3 +73,17 @@ sdkconfig
 sdkconfig.old
 managed_components/
 .direnv/
+
+# Slicer output
+*.gcode
+
+# KiCad
+*.kicad_prl
+*-backups/
+~*.lck
+fp-info-cache
+*.kicad_pcb-bak
+*.kicad_sch-bak
+
+# VS Code Local History
+.history/
