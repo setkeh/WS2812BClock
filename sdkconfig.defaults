@@ -10,3 +10,9 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 # Firmware version, reported at boot and usable by an update server.
 CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
 CONFIG_APP_PROJECT_VER="0.1.0"
+
+# Core dumps: panics are written to the coredump partition instead of only
+# being printed to a UART nobody is watching.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_SHA256=y

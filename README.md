@@ -191,6 +191,26 @@ at the one matching the target.
 Losing the signing key means signed clocks stop accepting updates and must be
 reflashed over USB. It lives in 1Password; keep that recoverable.
 
+## Core dumps
+
+Panic output goes straight to the UART as the chip resets, so on a wall-mounted
+clock it is lost. `esp_core_dump` writes a dump to the 64 KB `coredump`
+partition instead, which survives the reset:
+
+```bash
+idf.py -p <port> coredump-info      # decode: panic reason, backtrace, all tasks
+```
+
+An empty partition decodes as version `0xffff` and size `4294967295` — that is
+erased flash, not a failure.
+
+Debug builds accept **`crash`** typed on the serial console, which calls
+`abort()` on purpose so the path can be tested without waiting for a real
+fault. The command lives in the UART receive task, which only exists when
+`DEBUG_BUILD` is set, so a release build does not have it.
+
+Shipping dumps off the device over WiFi is issue #17.
+
 ## Layout
 
 ```
