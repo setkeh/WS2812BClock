@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <string.h>
+
 #include "debug.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -12,6 +14,8 @@
 
 #define BLINK_GPIO CONFIG_BLINK_GPIO
 
+
+static const char *TAG = "debug";
 
 #define ACT_LED_MS 50
 
@@ -33,13 +37,29 @@ static int log_hook(const char *fmt, va_list args) {
 }
 
 // RX: read incoming bytes and pulse on each batch
+// Typing "crash" on the serial console aborts on purpose, so the core dump
+// path can be tested without waiting for a real fault. Debug builds only.
+static void check_for_crash_command(const uint8_t *buf, int n)
+{
+    static char recent[8];
+    for (int i = 0; i < n; i++) {
+        memmove(recent, recent + 1, sizeof(recent) - 1);
+        recent[sizeof(recent) - 2] = (char)buf[i];
+        recent[sizeof(recent) - 1] = '\0';
+        if (strstr(recent, "crash")) {
+            ESP_LOGW(TAG, "crash requested from the console; aborting");
+            abort();
+        }
+    }
+}
+
 static void uart_rx_task(void *arg) {
     uint8_t buf[64];
     while (true) {
         int n = uart_read_bytes(UART_NUM_0, buf, sizeof(buf), pdMS_TO_TICKS(100));
         if (n > 0) {
             act_pulse();
-            // handle buf[0..n) here if you want to act on commands
+            check_for_crash_command(buf, n);
         }
     }
 }

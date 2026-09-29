@@ -1,7 +1,10 @@
-# ESP32, 4 MB flash, two OTA slots of ~1.94 MB each.
-# Name,     Type, SubType, Offset,   Size,     Flags
-nvs,        data, nvs,     0x9000,   0x6000,
-otadata,    data, ota,     0xf000,   0x2000,
-phy_init,   data, phy,     0x11000,  0x1000,
-ota_0,      app,  ota_0,   0x20000,  0x1F0000,
-ota_1,      app,  ota_1,   0x210000, 0x1F0000,
+# ESP32, 4 MB flash. Two OTA slots of 1920 KB, plus a 64 KB core dump area so
+# panics survive a reset and can be decoded later without a USB cable.
+# App partitions must start on a 64 KB boundary.
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x6000,
+otadata,    data, ota,      0xf000,   0x2000,
+phy_init,   data, phy,      0x11000,  0x1000,
+coredump,   data, coredump, 0x12000,  0x10000,
+ota_0,      app,  ota_0,    0x30000,  0x1E0000,
+ota_1,      app,  ota_1,    0x210000, 0x1E0000,
