@@ -1,0 +1,61 @@
+menu "WS2812B Clock OTA"
+
+    config OTA_BASE_URL
+        string "Update server base URL (https://...)"
+        default ""
+        help
+            Base URL of the update server, without a trailing slash. The
+            device fetches <base>/<model>/latest.json and, if the version
+            there differs from the running one, the .bin it names.
+            Leave empty to disable updates.
+
+    config OTA_MODEL
+        string "Model directory on the update server"
+        default "ws2812bclock-esp32"
+        help
+            Names both the hardware and the chip target, so a build for one
+            target can never be served to another.
+
+    config OTA_AUTH_TOKEN
+        string "Shared token sent as the X-OTA-Token header"
+        default ""
+        help
+            Set this in your local sdkconfig (which is gitignored), never in
+            sdkconfig.defaults. Leave empty to send no header.
+
+    choice OTA_CERT_SOURCE
+        prompt "How to verify the update server"
+        default OTA_CERT_SOURCE_BUNDLE
+
+        config OTA_CERT_SOURCE_BUNDLE
+            bool "Public CA (ESP-IDF certificate bundle)"
+            help
+                For a server with a publicly trusted certificate, e.g. one
+                issued by Let's Encrypt.
+
+        config OTA_CERT_SOURCE_EMBEDDED
+            bool "Embedded certificate (self-signed or private CA)"
+            help
+                Trusts only components/ota/certs/server_ca.pem, which is
+                compiled into the firmware. Prefer embedding your own CA
+                rather than the server cert, so server certs can be reissued
+                without reflashing every device.
+    endchoice
+
+    config OTA_CHECK_ON_BOOT
+        bool "Check for updates"
+        default n
+        help
+            Checks once the clock has network and valid time, then repeats
+            every OTA_CHECK_INTERVAL_MIN minutes.
+
+    config OTA_CHECK_INTERVAL_MIN
+        int "Minutes between update checks (0 = only at boot)"
+        depends on OTA_CHECK_ON_BOOT
+        range 0 10080
+        default 15
+        help
+            Each check is one small HTTPS request for latest.json, so a short
+            interval is cheap. An update installs and reboots immediately.
+
+endmenu

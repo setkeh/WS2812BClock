@@ -34,13 +34,27 @@
           lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") idf.passthru.toolEnv
         );
 
+        # esp-rom-elfs is the one required tool with no version command, so
+        # idf_tools.py cannot detect it on PATH the way it detects the
+        # compilers and OpenOCD. Without it, `idf_tools.py export` fails and
+        # the VS Code extension cannot build its environment. Giving it the
+        # directory layout it expects is enough; everything else is found on
+        # PATH already.
+        idfToolsShim = pkgs.runCommand "esp-idf-tools-shim" {
+          nativeBuildInputs = [ pkgs.python3 ];
+        } ''
+          ver=$(python3 -c "import json; print(next(t for t in json.load(open('${idf}/tools/tools.json'))['tools'] if t['name'] == 'esp-rom-elfs')['versions'][0]['name'])")
+          mkdir -p $out/tools/esp-rom-elfs
+          ln -s ${lib.removeSuffix "/" idf.passthru.toolEnv.ESP_ROM_ELF_DIR} $out/tools/esp-rom-elfs/$ver
+        '';
+
         # The VS Code ESP-IDF extension (v2+) only discovers installs through
         # EIM's eim_idf.json, and loads each one's environment by running its
         # activationScript with `-e` and parsing KEY=VALUE lines.
         idfActivate = pkgs.writeShellScript "esp-idf-activate" ''
           ${toolEnvExports}
           export IDF_PATH=${idf}
-          export IDF_TOOLS_PATH=${idf}/tools
+          export IDF_TOOLS_PATH=${idfToolsShim}
           export IDF_PYTHON_ENV_PATH=$(readlink ${idf}/python-env)
           export IDF_PYTHON_CHECK_CONSTRAINTS=no
           export GIT_CONFIG_SYSTEM=${idf}/etc/gitconfig
@@ -70,12 +84,12 @@
                   data = json.load(f)
           except (FileNotFoundError, json.JSONDecodeError):
               data = {}
-          entry_id = "nix-" + os.path.basename(project)
+          entry_id = "nix-" + project
           entry = {
               "id": entry_id,
-              "name": "ESP-IDF ${idf.version} (nix: " + os.path.basename(project) + ")",
+              "name": "ESP-IDF ${idf.version} (nix: " + project + ")",
               "path": "${idf}",
-              "idfToolsPath": "${idf}/tools",
+              "idfToolsPath": "${idfToolsShim}",
               "python": os.path.realpath("${idf}/python-env") + "/bin/python3",
               "activationScript": activate,
           }
@@ -102,7 +116,8 @@
 
           shellHook = ''
             ${toolEnvExports}
-            ${registerIdf} "$PWD" ${idfActivate} || echo "warning: could not register ESP-IDF for VS Code" >&2
+            export IDF_TOOLS_PATH=${idfToolsShim}
+            ${registerIdf} WS2812BClock ${idfActivate} || echo "warning: could not register ESP-IDF for VS Code" >&2
           '';
         };
       }
