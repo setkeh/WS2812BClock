@@ -70,6 +70,29 @@ Per the [Normand SK6812 datasheet Rev 06](https://www.normandled.com/upload/2016
   on diode test (VSS conducts to all three others), mark that jig corner, and orient every
   LED to match.
 
+### Pad mapping that was verified on these parts (2026-09-25)
+
+Established empirically on the eBay SK6812 5050s used in this build, after two LEDs lit:
+
+> **DIN is the pad next to VDD. DOUT is the pad next to VSS.**
+> VDD is diagonally opposite VSS, and DIN diagonally opposite DOUT.
+
+Both data pads are adjacent to VSS — one along each axis — so "next to VSS" is ambiguous
+and is not a safe rule. Key off VDD instead.
+
+Diagnostics that identified the faults, for reuse on the remaining pixels:
+
+- **Data line sits at ~2.2 V instead of 3.3 V** (measured through the 390 Ω series
+  resistor, ≈2.8 mA): the LED is not powered, and the data pin is phantom-powering the
+  chip through its protection diode. Check VDD/VSS at the LED's own pads.
+- **No light, no heat, correct supply:** data on the wrong pad (DOUT instead of DIN).
+- **Hot, no light:** VDD/VSS reversed. The part is destroyed within seconds.
+- **DOUT is idle unless more pixels' data is being sent than the chain has consumed.**
+  Testing with `LED_TEST_COUNT` set to 1 means LED 1 absorbs the whole frame and forwards
+  nothing, so probing DOUT proves nothing. Set the count to at least the number wired.
+- A plain 1 Hz GPIO toggle on the data pin (meter-readable) separates "pin/board/firmware"
+  faults from LED-side faults; the LED never repeats it, since it isn't valid data.
+
 ## Jigs
 
 Both parts hold LEDs **lens-down** so the pads face up for soldering, and with
