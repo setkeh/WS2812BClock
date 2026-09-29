@@ -11,6 +11,7 @@
 #include "fan.h"
 #include "wifi.h"
 #include "ntp.h"
+#include "display.h"
 
 #include "nvs_flash.h"
 
@@ -46,7 +47,9 @@ static void on_ntp_synced(void *arg, esp_event_base_t base, int32_t id, void *da
     s_realign = true;
 }
 
+
 void app_main(void) {
+
     if (DEBUG_BUILD)
     {
         activity_led_init();
@@ -58,6 +61,9 @@ void app_main(void) {
       ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    ESP_ERROR_CHECK(display_init());
+    display_show_waiting();
 
     if (!wifi_init_sta()) {
         ESP_LOGW(TAG, "WiFi not up yet, will keep retrying in the background");
@@ -78,11 +84,13 @@ void app_main(void) {
             char zone[8];
             gettimeofday(&tv, NULL);
             localtime_r(&tv.tv_sec, &local);
+            display_show_time(&local);
             strftime(zone, sizeof(zone), "%Z", &local);
             strftime(buf, sizeof(buf), "%H:%M:%S", &local);
             // Show milliseconds while testing i can see the alignment working
             ESP_LOGI(TAG, "tick %s.%03ld %s", buf, (long)(tv.tv_usec / 1000), zone);
         } else {
+            display_show_waiting();
             ESP_LOGI(TAG, "tick: waiting for first NTP sync");
         }
 
