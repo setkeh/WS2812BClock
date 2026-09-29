@@ -12,11 +12,13 @@
 #include "wifi.h"
 #include "ntp.h"
 #include "display.h"
+#include "ota.h"
 
 #include "nvs_flash.h"
 
 static const char *TAG = "clock";
 static volatile bool s_realign = false;
+static bool s_confirmed_healthy = false;
 
 // Define Config Build
 #ifdef CONFIG_DEBUG_BUILD
@@ -49,6 +51,8 @@ static void on_ntp_synced(void *arg, esp_event_base_t base, int32_t id, void *da
 
 
 void app_main(void) {
+    ota_log_running_version();
+
 
     if (DEBUG_BUILD)
     {
@@ -85,6 +89,13 @@ void app_main(void) {
             gettimeofday(&tv, NULL);
             localtime_r(&tv.tv_sec, &local);
             display_show_time(&local);
+            if (!s_confirmed_healthy) {
+                s_confirmed_healthy = true;
+                ota_mark_current_app_valid();   // network, time and display all up
+#if CONFIG_OTA_CHECK_ON_BOOT
+                ota_check_async();              // own task: TLS needs more stack than main has
+#endif
+            }
             strftime(zone, sizeof(zone), "%Z", &local);
             strftime(buf, sizeof(buf), "%H:%M:%S", &local);
             // Show milliseconds while testing i can see the alignment working
