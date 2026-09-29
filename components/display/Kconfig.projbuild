@@ -1,0 +1,60 @@
+menu "WS2812B Clock Display"
+
+    config DISPLAY_RING_GPIO
+        int "Ring data GPIO"
+        range 0 39
+        default 32
+
+    config DISPLAY_RING_COUNT
+        int "Ring pixel count"
+        range 1 300
+        default 60
+
+    config DISPLAY_SEG_GPIO
+        int "Seven-segment data GPIO"
+        range 0 39
+        default 25
+
+    config DISPLAY_SEG_COUNT
+        int "Seven-segment pixel count"
+        range 1 300
+        default 28
+
+    config DISPLAY_ALTERNATE_DATE
+        bool "Alternate the digits between time and date"
+        default y
+        help
+            Shows HH MM for the first 30 s of each minute and DD MM for the
+            rest. Turn off to show the time only.
+
+    config DISPLAY_RING_DAY_BRIGHTNESS
+        int "Ring daytime brightness (%)"
+        range 1 100
+        default 5
+
+    config DISPLAY_RING_NIGHT_BRIGHTNESS
+        int "Ring night-time brightness (%)"
+        range 1 100
+        default 1
+
+    config DISPLAY_SEG_DAY_BRIGHTNESS
+        int "Seven-segment daytime brightness (%)"
+        range 1 100
+        default 50
+
+    config DISPLAY_SEG_NIGHT_BRIGHTNESS
+        int "Seven-segment night-time brightness (%)"
+        range 1 100
+        default 5
+
+    config DISPLAY_NIGHT_START_HOUR
+        int "Night starts at hour (local, 0-23)"
+        range 0 23
+        default 19
+
+    config DISPLAY_NIGHT_END_HOUR
+        int "Night ends at hour (local, 0-23)"
+        range 0 23
+        default 6
+
+endmenu
