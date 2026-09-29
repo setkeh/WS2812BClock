@@ -87,3 +87,6 @@ fp-info-cache
 
 # VS Code Local History
 .history/
+
+# OTA server certificate (deployment-specific)
+components/ota/certs/*.pem
