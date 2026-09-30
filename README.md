@@ -341,6 +341,81 @@ roughly three to one, so releases cost a few megabytes each on the update
 server. Old images and symbols are never cleaned up; that retention policy is
 still to be decided.
 
+## The crash receiver — `server/crashd`
+
+### Why it exists
+
+Everything else the clock says travels as syslog over UDP, which is lossy on
+purpose: a clock must never stall because logging cannot get out. A core dump
+cannot travel that way. It is a binary ELF of tens of kilobytes that has to
+arrive byte-perfect, and a log store has nothing useful to do with it — you
+cannot search or aggregate a core dump, and base64 in a text index would cost a
+third more for nothing. So it needs its own path, and that path needs something
+at the far end to catch it.
+
+### Why not just let Caddy accept the upload
+
+Caddy's standard build has no upload handler, so this would mean rebuilding it
+with `xcaddy` and a WebDAV module. That was rejected deliberately.
+
+The endpoint is reachable from the IoT VLAN. Firmware images are signed, so
+nobody can install a malicious one — but **`latest.json` is not signed**, and
+anything that can write to the firmware tree can pin the whole fleet to an old
+version or simply fill the disk. Scoping a general-purpose write module
+tightly enough to prevent that is more thinking than a service whose only
+ability is to create one new file per request, under a name it chooses itself,
+in a directory that is not the firmware one.
+
+### How it operates
+
+A single static Go binary. No dependencies, no database, no TLS of its own.
+
+```
+POST /crash/{model}
+  X-OTA-Token         the same shared token the firmware sends for updates
+  X-Device-Hostname   which clock
+  X-Firmware-Version  what it was running
+  X-App-Elf-Sha256    identifies the build whose symbols decode this dump
+  body                the coredump partition, verbatim
+```
+
+It listens on localhost and sits behind the existing Caddy terminator, so
+devices reach it on the same host, with the same certificate and token as
+update checks — which also means it needs no firewall rule of its own.
+
+Stored as `{dir}/{model}/{hostname}-{version}-{unix}.elf`. The server picks
+that name; nothing a client sends reaches a filesystem path without matching
+`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` first. Uploads are written to a temporary
+file and renamed, so a transfer that dies half way never looks like a complete
+dump. The token is compared in constant time, and the body is capped at twice
+the partition size.
+
+On the device, the dump is streamed in 1 KB chunks from its own task, and
+**erased only on a 2xx**. That makes the whole thing exactly-once and
+self-limiting: a clock that cannot reach the server keeps its dump and tries
+again on the next boot, and a crash loop uploads one dump per crash rather than
+the same one repeatedly.
+
+### Deploying it
+
+Releases are built by `.github/workflows/release-crashd.yml` on a `crashd-v*`
+tag — tagged separately from the firmware, which is versioned through
+`CONFIG_APP_PROJECT_VER` rather than git tags — and attached as a static
+`linux/amd64` binary with a `.sha256` beside it. The host needs no Go
+toolchain.
+
+It runs on the monitoring host beside the OTA server, deployed by Salt from the
+infrastructure repository. **This repository owns the code and the wire format;
+the infrastructure repository owns how it runs** — the systemd unit, the Caddy
+route, directory ownership. The split is deliberate: the receiver's contract is
+the firmware's, so those two change together, in one commit, here.
+
+The one constraint that matters when deploying it: its storage directory must
+not sit under the firmware tree, and the unit should have no write access to
+`/srv/ota` at all. That is the whole reason it exists in this shape.
+
+`server/crashd/README.md` has the full interface, flags and decode recipe.
+
 ## Layout
 
 ```
@@ -348,7 +423,7 @@ components/
 ├── display/   both LED chains, position maps, font, brightness
 ├── ntp/       SNTP, timezone, NTP_EVENT, ntp_time_is_valid()
 ├── wifi/      station mode, retries forever with back-off
-├── ota/       manifest check, HTTPS update, rollback handling
+├── ota/       manifest check, HTTPS update, rollback, crash dump upload
 ├── fan/       LEDC PWM fan control with kick-start
 ├── logship/   syslog-over-UDP log shipping, crash reports on boot
 └── debug/     activity LED on serial traffic
@@ -356,4 +431,5 @@ main/          startup, the second-aligned tick loop, rendering
 CAD/           jigs, clock geometry, KiCad project
 scripts/       signing key and release helpers
 server/crashd/ core dump receiver, deployed beside the OTA server
+.github/       CI for server/crashd, and its tagged release build
 ```
