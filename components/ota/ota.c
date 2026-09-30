@@ -12,6 +12,7 @@
 #include "esp_https_ota.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_timer.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "ota";
@@ -184,15 +185,52 @@ esp_err_t ota_update_now(void)
         .http_client_init_cb = add_auth_header,
     };
 
-    // Signature verification happens inside esp_https_ota when signed images
-    // are enabled, so a corrupted or unsigned download is rejected here.
-    err = esp_https_ota(&ota_cfg);
+    // The stepwise API rather than esp_https_ota(): that one downloads the
+    // whole image in a single blocking call with no way to report progress,
+    // which on a weak link is several silent minutes in which a slow download
+    // and a stuck one look identical.
+    esp_https_ota_handle_t ota = NULL;
+    err = esp_https_ota_begin(&ota_cfg, &ota);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "update failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "update could not start: %s", esp_err_to_name(err));
         return err;
     }
 
-    ESP_LOGI(TAG, "update installed, restarting");
+    int64_t started = esp_timer_get_time();
+    int total = esp_https_ota_get_image_size(ota);
+    int reported = 0;
+
+    while ((err = esp_https_ota_perform(ota)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+        int done = esp_https_ota_get_image_len_read(ota);
+        if (total <= 0) continue;                   // server sent no length
+        int pct = (int)((int64_t)done * 100 / total);
+        if (pct >= reported + CONFIG_OTA_PROGRESS_STEP_PCT) {
+            reported = pct;
+            ESP_LOGI(TAG, "downloaded %d%% (%d/%d bytes)", pct, done, total);
+        }
+    }
+
+    if (err != ESP_OK || !esp_https_ota_is_complete_data_received(ota)) {
+        // A connection that dies mid-transfer ends up here, having written a
+        // partial image. abort() releases the handle and leaves the running
+        // slot untouched.
+        ESP_LOGE(TAG, "download failed after %d of %d bytes: %s",
+                 esp_https_ota_get_image_len_read(ota), total, esp_err_to_name(err));
+        esp_https_ota_abort(ota);
+        return err == ESP_OK ? ESP_FAIL : err;
+    }
+
+    // Signature verification happens here: finish() calls esp_ota_end(), which
+    // is what rejects a corrupted or unsigned image when signed images are
+    // enabled. Skipping finish() would skip the check.
+    err = esp_https_ota_finish(ota);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "update rejected: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "update installed in %d s, restarting",
+             (int)((esp_timer_get_time() - started) / 1000000));
     esp_restart();
     return ESP_OK;   // not reached
 }
