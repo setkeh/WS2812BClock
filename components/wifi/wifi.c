@@ -114,6 +114,14 @@ bool wifi_init_sta(void)
 
     ESP_ERROR_CHECK(esp_wifi_start() );
 
+    // ESP-IDF defaults a station to modem sleep, which trades throughput and
+    // latency for power this clock is not short of. See WIFI_POWER_SAVE.
+#ifdef CONFIG_WIFI_POWER_SAVE
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+#else
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+#endif
+
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
