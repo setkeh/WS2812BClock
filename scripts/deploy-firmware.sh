@@ -7,7 +7,8 @@
 #
 # Publishes to <host>:<root>/<model>/ as:
 #     <model>-<version>.bin     the image
-#     latest.json               {"version", "file", "sha256", "size"}
+#     <model>-<version>.elf.gz  its symbols, for decoding core dumps later
+#     latest.json               {"version", "file", "elf", "sha256", "size"}
 #
 # The image is uploaded first and the manifest second, so a device fetching
 # mid-deploy never sees a manifest pointing at a file that is not there yet.
@@ -66,12 +67,25 @@ fi
 # The app image is named in the build metadata; globbing build/*.bin would
 # also match ota_data_initial.bin and friends.
 APP_BIN="$(python3 -c "import json;print(json.load(open('build/project_description.json'))['app_bin'])" 2>/dev/null || true)"
+APP_ELF="$(python3 -c "import json;print(json.load(open('build/project_description.json'))['app_elf'])" 2>/dev/null || true)"
 BIN="$PROJECT_DIR/build/$APP_BIN"
+ELF="$PROJECT_DIR/build/$APP_ELF"
 [ -n "$APP_BIN" ] && [ -f "$BIN" ] || { echo "no firmware binary in build/ (run a build first)" >&2; exit 1; }
+
+# A core dump is undecodable without the exact ELF that produced it. Publishing
+# the image without its symbols means any crash from this release becomes
+# unreadable the moment build/ is overwritten, which is usually the next build.
+[ -n "$APP_ELF" ] && [ -f "$ELF" ] || { echo "no ELF in build/; cannot publish symbols for this release" >&2; exit 1; }
 
 STAGE="$(mktemp -d)"
 RELEASE="$MODEL-$VERSION.bin"
+RELEASE_ELF="$MODEL-$VERSION.elf.gz"
 cp "$BIN" "$STAGE/$RELEASE"
+
+# The unstripped ELF is roughly ten times the size of the image it describes
+# and compresses about three to one, which matters because every release keeps
+# one forever.
+gzip -9 -c "$ELF" > "$STAGE/$RELEASE_ELF"
 
 SHA="$(sha256sum "$STAGE/$RELEASE" | cut -d' ' -f1)"
 SIZE="$(stat -c %s "$STAGE/$RELEASE")"
@@ -79,6 +93,7 @@ cat > "$STAGE/latest.json" <<JSON
 {
   "version": "$VERSION",
   "file": "$RELEASE",
+  "elf": "$RELEASE_ELF",
   "sha256": "$SHA",
   "size": $SIZE
 }
@@ -87,6 +102,7 @@ JSON
 echo "model:   $MODEL"
 echo "version: $VERSION"
 echo "file:    $RELEASE ($SIZE bytes)"
+echo "symbols: $RELEASE_ELF ($(stat -c %s "$STAGE/$RELEASE_ELF") bytes)"
 echo "sha256:  $SHA"
 echo "target:  $OTA_HOST:$OTA_ROOT/$MODEL/"
 
@@ -97,8 +113,9 @@ if [ "$dry_run" = 1 ]; then
     exit 0
 fi
 
-# Image first, manifest second.
+# Image and symbols first, manifest second.
 rsync -av "$STAGE/$RELEASE" "$OTA_HOST:$OTA_ROOT/$MODEL/"
+rsync -av "$STAGE/$RELEASE_ELF" "$OTA_HOST:$OTA_ROOT/$MODEL/"
 rsync -av "$STAGE/latest.json" "$OTA_HOST:$OTA_ROOT/$MODEL/"
 
 echo "published $MODEL $VERSION"

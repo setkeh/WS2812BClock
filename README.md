@@ -314,9 +314,30 @@ the collector like any other log line and the clock never has to be unplugged
 to find out what happened. Paste the backtrace into `addr2line` against the
 matching build, which the report identifies by its app ELF SHA256.
 
-The dump itself stays in flash; uploading the whole ELF needs an endpoint to
-receive it, which is not built yet. `idf.py coredump-info` over USB is still
-the way to get a full symbolised trace with every task's stack.
+The dump itself stays in flash; uploading it needs an endpoint to receive it,
+which is not built yet. `idf.py coredump-info` over USB is still the way to get
+a full symbolised trace with every task's stack.
+
+### Symbols are published with every release
+
+A core dump is undecodable without the exact ELF that produced it, and `build/`
+is overwritten by the next build. `deploy-firmware.sh` therefore publishes
+`<model>-<version>.elf.gz` alongside each image and names it in `latest.json`.
+The crash report logs the crashing build's `app_elf_sha256`, so the report
+identifies which one it needs — it just has to still exist.
+
+To decode a dump against a release that is no longer in `build/`:
+
+```bash
+scp ota:/srv/ota/<model>/<model>-<version>.elf.gz .
+gunzip <model>-<version>.elf.gz
+esp-coredump info_corefile -c <dump> <model>-<version>.elf
+```
+
+The ELF is about ten times the size of the image it describes and compresses
+roughly three to one, so releases cost a few megabytes each on the update
+server. Old images and symbols are never cleaned up; that retention policy is
+still to be decided.
 
 ## Layout
 
