@@ -16,3 +16,9 @@ CONFIG_APP_PROJECT_VER="0.1.0"
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
 CONFIG_ESP_COREDUMP_CHECKSUM_SHA256=y
+
+# Remote logging: a clock on a wall has no serial cable attached. Log lines are
+# copied to a syslog collector over UDP. The collector's address is site
+# specific, so it is set in menuconfig like the WiFi credentials; with no host
+# configured this costs nothing at runtime.
+CONFIG_LOGSHIP_ENABLE=y

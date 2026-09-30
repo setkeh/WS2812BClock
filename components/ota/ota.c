@@ -40,6 +40,15 @@ void ota_log_running_version(void)
         ESP_LOGW(TAG, "image is on probation: it will roll back unless it "
                       "marks itself valid this boot");
     }
+
+    // A clock on a wall that cannot update itself is the worst way to fail,
+    // because nothing about it looks wrong. Say so at every boot, loudly
+    // enough that it shows up in the log stream.
+    if (strlen(CONFIG_OTA_BASE_URL) == 0)
+        ESP_LOGW(TAG, "NO UPDATE SERVER CONFIGURED: this build cannot update itself");
+#if !CONFIG_OTA_CHECK_ON_BOOT
+    ESP_LOGW(TAG, "update checking is disabled: this build will not fetch updates");
+#endif
 }
 
 void ota_mark_current_app_valid(void)
