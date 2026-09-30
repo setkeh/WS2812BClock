@@ -18,4 +18,17 @@ menu "WS2812B Clock Wifi"
         help
             Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
 
+    config WIFI_POWER_SAVE
+        bool "WiFi power save (modem sleep)"
+        default n
+        help
+            Let the radio sleep between the access point's DTIM beacons. This
+            is ESP-IDF's default for a station, and it costs throughput and
+            latency: at a DTIM period of 3 the radio wakes roughly every
+            300 ms, which was measured turning an 850 KB OTA download into a
+            four minute one and putting ping times at 140-430 ms on a LAN.
+
+            A mains-powered clock has nothing to gain from it, so it is off
+            here. Turn it on for a battery-powered build.
+
 endmenu

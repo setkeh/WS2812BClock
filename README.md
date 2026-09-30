@@ -62,7 +62,7 @@ All under `idf.py menuconfig`:
 | Menu | Options |
 | --- | --- |
 | *WS2812B Clock Display* | Ring and digit GPIOs and pixel counts, day/night brightness for each, night window (default 19:00–06:00), time/date alternation |
-| *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY` |
+| *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY`, `WIFI_POWER_SAVE` (off: modem sleep costs OTA throughput and log latency for power a mains-powered clock does not need) |
 | *WS2812B Clock NTP* | Server (default `pool.ntp.org`), timezone (default Sydney), sync method |
 | *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot |
 | *WS2812B Clock Remote Logging* | Collector host and UDP port, syslog APP-NAME and HOSTNAME, line length, queue depth, core dump reporting |
