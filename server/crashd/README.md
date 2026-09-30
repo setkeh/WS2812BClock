@@ -71,6 +71,11 @@ gunzip <model>-<version>.elf.gz
 esp-coredump info_corefile -c <dump>.elf -t raw <model>-<version>.elf
 ```
 
+## Deploying
+
+See `DEPLOYING.md` for what the service needs from its host, including the
+constraint that its storage directory must not sit inside the firmware tree.
+
 ## Building
 
 ```bash
