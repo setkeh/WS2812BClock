@@ -51,11 +51,12 @@ menu "WS2812B Clock Remote Logging"
         int "Lines held while the link is down"
         depends on LOGSHIP_ENABLE
         range 4 128
-        default 32
+        default 64
         help
             Lines queue up until the collector is reachable, so the boot
-            messages survive the wait for WiFi. Once it is full the newest
-            lines are dropped and a count of them is sent later.
+            messages survive the wait for WiFi -- and the WiFi driver alone
+            logs about 25 of them. Once it is full the oldest line is dropped
+            to make room, and a count of what was lost is sent later.
 
     config LOGSHIP_REPORT_COREDUMP
         bool "Report a stored core dump on boot"

@@ -21,6 +21,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 static const char *TAG = "logship";
@@ -41,13 +42,21 @@ static const char *TAG = "logship";
 // so a collector that is down does not mean a DNS lookup per log line.
 #define RESOLVE_RETRY_US (10 * 1000000LL)
 
+// Anything at or after 2024 means NTP has landed and the wall clock is real.
+#define CLOCK_VALID_EPOCH 1704067200LL
+
 typedef struct {
     uint16_t len;
     uint8_t  sev;
+    int64_t  mono_us;   // esp_timer_get_time() when the line was logged
+    int64_t  wall_us;   // wall clock when logged, 0 if it was not set yet
     char     text[LINE_BYTES];
 } line_t;
 
 static QueueHandle_t     s_queue;
+static SemaphoreHandle_t s_lock;     // guards the partial line below
+static line_t            s_acc;      // the line currently being assembled
+static TaskHandle_t      s_acc_owner;
 static TaskHandle_t      s_sender;
 static bool              s_started;
 static vprintf_like_t    s_prev;
@@ -92,6 +101,92 @@ static uint16_t flatten(char *buf, int len)
     return (uint16_t)out;
 }
 
+// Hands a finished line to the sender. The lock must be held.
+static void emit_locked(void)
+{
+    s_acc.len = flatten(s_acc.text, s_acc.len);
+    if (s_acc.len > 0) {
+        s_acc.sev = severity_of(s_acc.text[0]);
+
+        // Never wait for room: a full queue means the link is down, and the
+        // clock must keep running regardless. When it is full, throw away the
+        // OLDEST line instead of this one -- what led up to a fault is worth
+        // more than what the device was doing at boot.
+        if (xQueueSend(s_queue, &s_acc, 0) != pdTRUE) {
+            line_t evicted;
+            if (xQueueReceive(s_queue, &evicted, 0) == pdTRUE)
+                atomic_fetch_add(&s_dropped, 1);
+            if (xQueueSend(s_queue, &s_acc, 0) != pdTRUE)
+                atomic_fetch_add(&s_dropped, 1);
+        }
+    }
+    s_acc.len = 0;
+    s_acc_owner = NULL;
+}
+
+// One logical log line does not always arrive in one call: the WiFi driver
+// emits its banner as a prefix plus a separate body, and shipping each
+// fragment as its own syslog message makes the stream unreadable. Fragments
+// are appended until a newline shows the line is complete.
+static void accumulate(const char *fmt, va_list args)
+{
+    TaskHandle_t me = xTaskGetCurrentTaskHandle();
+    struct timeval tv;
+    size_t room;
+    int wrote;
+    bool complete;
+
+    // The lock is held for a vsnprintf and a queue push -- microseconds -- so
+    // this timeout should never be reached. It is a bound, not a wait: the
+    // clock must not stall because something else is logging.
+    if (xSemaphoreTake(s_lock, pdMS_TO_TICKS(10)) != pdTRUE) {
+        atomic_fetch_add(&s_dropped, 1);
+        return;
+    }
+
+    // A fragment from a different task means the line in progress will never
+    // be finished. Flush it as it stands rather than interleaving two lines.
+    if (s_acc.len > 0 && s_acc_owner != me)
+        emit_locked();
+
+    if (s_acc.len == 0) {
+        // Timestamp the line where it starts, not where it ends.
+        s_acc_owner = me;
+        s_acc.mono_us = esp_timer_get_time();
+        gettimeofday(&tv, NULL);
+        s_acc.wall_us = (tv.tv_sec >= CLOCK_VALID_EPOCH)
+                      ? (int64_t)tv.tv_sec * 1000000 + tv.tv_usec : 0;
+    }
+
+    room = sizeof(s_acc.text) - s_acc.len;
+    wrote = vsnprintf(s_acc.text + s_acc.len, room, fmt, args);
+    if (wrote < 0) {
+        xSemaphoreGive(s_lock);
+        return;
+    }
+    if (wrote >= (int)room) wrote = room - 1;      // truncated to fit
+
+    // Checked before flatten(), which turns the newline into a space.
+    complete = memchr(s_acc.text + s_acc.len, '\n', wrote) != NULL;
+    s_acc.len += wrote;
+
+    if (complete || s_acc.len >= sizeof(s_acc.text) - 1)
+        emit_locked();
+
+    xSemaphoreGive(s_lock);
+}
+
+// Flushes a fragment that never got its newline, so a partial line cannot sit
+// in the buffer indefinitely when the device goes quiet. Called from the
+// sender when it has nothing else to do.
+static void flush_stale(void)
+{
+    if (xSemaphoreTake(s_lock, 0) != pdTRUE) return;
+    if (s_acc.len > 0)
+        emit_locked();
+    xSemaphoreGive(s_lock);
+}
+
 // Runs on whichever task called ESP_LOGx, so it must not block and must not
 // log anything itself.
 static int log_hook(const char *fmt, va_list args)
@@ -105,19 +200,8 @@ static int log_hook(const char *fmt, va_list args)
 
     // Anything the sender task logs would arrive straight back here; the DNS
     // resolver and lwip do log on failure, so that loop has to be cut.
-    if (s_queue && xTaskGetCurrentTaskHandle() != s_sender) {
-        line_t line;
-        int len = vsnprintf(line.text, sizeof(line.text), fmt, copy);
-        if (len > 0) {
-            if (len >= (int)sizeof(line.text)) len = sizeof(line.text) - 1;
-            line.len = flatten(line.text, len);
-            line.sev = severity_of(line.text[0]);
-            // Never wait for room: a full queue means the link is down, and
-            // the clock must keep running regardless.
-            if (line.len > 0 && xQueueSend(s_queue, &line, 0) != pdTRUE)
-                atomic_fetch_add(&s_dropped, 1);
-        }
-    }
+    if (s_queue && xTaskGetCurrentTaskHandle() != s_sender)
+        accumulate(fmt, copy);
 
     va_end(copy);
     return n;
@@ -148,23 +232,39 @@ static const char *device_hostname(void)
     return name;
 }
 
-static void timestamp(char *out, size_t cap)
+// The time a line is sent is not the time it happened: boot messages sit in
+// the queue until the network is up, which can be seconds. Stamp them with
+// when they were logged.
+static void timestamp(char *out, size_t cap, const line_t *line)
 {
-    struct timeval tv;
+    struct timeval now;
     struct tm utc;
+    int64_t wall_us = line->wall_us;
 
-    gettimeofday(&tv, NULL);
-    gmtime_r(&tv.tv_sec, &utc);
+    if (wall_us == 0) {
+        // The clock was not set when this line was logged. If it has been set
+        // since -- the normal case for boot messages, which queue up until NTP
+        // lands -- recover the real time by working back from how long ago it
+        // was logged, measured on the monotonic timer.
+        gettimeofday(&now, NULL);
+        if (now.tv_sec >= CLOCK_VALID_EPOCH) {
+            int64_t now_us = (int64_t)now.tv_sec * 1000000 + now.tv_usec;
+            wall_us = now_us - (esp_timer_get_time() - line->mono_us);
+        }
+    }
 
-    // Before the first NTP sync the clock reads 1970. "-" is the RFC 5424 way
-    // of saying "no timestamp", which makes the collector stamp it on arrival
-    // instead of filing boot messages half a century ago.
-    if (utc.tm_year + 1900 < 2024) {
+    // Still nothing usable: "-" is the RFC 5424 way of saying "no timestamp",
+    // which makes the collector stamp it on arrival rather than filing boot
+    // messages half a century ago.
+    if (wall_us == 0) {
         strlcpy(out, "-", cap);
         return;
     }
+
+    time_t secs = (time_t)(wall_us / 1000000);
+    gmtime_r(&secs, &utc);
     size_t n = strftime(out, cap, "%Y-%m-%dT%H:%M:%S", &utc);
-    snprintf(out + n, cap - n, ".%06ldZ", (long)tv.tv_usec);
+    snprintf(out + n, cap - n, ".%06dZ", (int)(wall_us % 1000000));
 }
 
 static bool destination_ready(void)
@@ -212,7 +312,7 @@ static void ship(const line_t *line)
     static char frame[LINE_BYTES + 128];   // sender task only, so static is safe
     char ts[40];
 
-    timestamp(ts, sizeof(ts));
+    timestamp(ts, sizeof(ts), line);
     int n = snprintf(frame, sizeof(frame) - 1, "<%d>1 %s %s %s - - - %.*s",
                      SYSLOG_FACILITY * 8 + line->sev, ts, device_hostname(),
                      CONFIG_LOGSHIP_APP_NAME, (int)line->len, line->text);
@@ -252,6 +352,8 @@ static void report_drops(void)
     if (n >= (int)sizeof(note.text)) n = sizeof(note.text) - 1;
     note.len = (uint16_t)n;
     note.sev = 4;
+    note.mono_us = esp_timer_get_time();
+    note.wall_us = 0;   // stamped from the monotonic timer like any other line
     ship(&note);
 }
 
@@ -271,7 +373,10 @@ static void sender_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
-        if (xQueueReceive(s_queue, &line, pdMS_TO_TICKS(1000)) != pdTRUE) continue;
+        if (xQueueReceive(s_queue, &line, pdMS_TO_TICKS(1000)) != pdTRUE) {
+            flush_stale();       // nothing came; release any unterminated line
+            continue;
+        }
         report_drops();
         ship(&line);
     }
@@ -285,8 +390,10 @@ void logship_init(void)
     }
 
     s_queue = xQueueCreate(QUEUE_DEPTH, sizeof(line_t));
-    if (!s_queue) {
+    s_lock = xSemaphoreCreateMutex();
+    if (!s_queue || !s_lock) {
         ESP_LOGE(TAG, "could not allocate the log queue");
+        s_queue = NULL;
         return;
     }
 

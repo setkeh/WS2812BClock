@@ -21,7 +21,9 @@ static const char *TAG = "crash";
 static const char *exccause_name(uint32_t cause)
 {
     switch (cause) {
-        case 0:  return "IllegalInstruction";
+        // abort() and a failed assert both reach the panic handler through an
+        // illegal instruction, so cause 0 is not necessarily a code bug.
+        case 0:  return "IllegalInstruction, or a deliberate abort/assert";
         case 1:  return "Syscall";
         case 2:  return "InstructionFetchError";
         case 3:  return "LoadStoreError";
