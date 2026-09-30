@@ -73,6 +73,31 @@ Shipped defaults: ring on GPIO32 (60 px) at 5% day / 1% night, digits on
 GPIO25 (28 px) at 50% day / 5% night. Brightness is worth tuning per build
 once the diffusers are in — the values in a local `sdkconfig` win over these.
 
+### Site-specific settings and backing them up
+
+Three things are not in this repository and never should be: the WiFi
+credentials, the OTA token, and the update server's root CA. The first two, plus
+the update server and log collector addresses, belong in
+**`sdkconfig.defaults.local`** — gitignored, and the one file worth backing up.
+Copy `sdkconfig.defaults.local.example` and fill it in.
+
+```bash
+cp sdkconfig.defaults.local.example sdkconfig.defaults.local
+$EDITOR sdkconfig.defaults.local
+```
+
+`CMakeLists.txt` appends it to `SDKCONFIG_DEFAULTS` when it exists, so a fresh
+clone configures itself. Note what that does and does not do: these are
+*defaults*. An existing `sdkconfig` overrides them, so editing this file after
+the fact changes nothing until `sdkconfig` is regenerated —
+`rm sdkconfig && idf.py reconfigure`. What it buys you is that a lost or reset
+`sdkconfig` costs one command instead of an evening of remembering what was in
+which menu.
+
+The firmware also complains at boot, at warning level, if it has no update
+server or update checking is off — a clock that silently cannot update itself
+looks perfectly healthy from across the room.
+
 ## Scripts
 
 ### `scripts/ota-key.sh` — signing key handling

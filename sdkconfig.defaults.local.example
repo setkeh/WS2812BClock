@@ -1,0 +1,24 @@
+# Copy to sdkconfig.defaults.local and fill in. That file is gitignored: this
+# repository is public, so none of these values belong in a tracked file.
+#
+# These are defaults, not overrides. An existing sdkconfig wins over them, so
+# changing a value here after the fact does nothing until sdkconfig is
+# regenerated (delete it and run `idf.py reconfigure`). What they buy you is
+# one file to back up, and a machine that configures itself from a fresh clone.
+
+CONFIG_WIFI_SSID=""
+CONFIG_WIFI_PSK=""
+
+# Where updates come from, and the token Caddy checks. Use the embedded
+# certificate source when the server is behind the private CA, and put the
+# root at components/ota/certs/server_ca.pem.
+CONFIG_OTA_BASE_URL=""
+CONFIG_OTA_AUTH_TOKEN=""
+CONFIG_OTA_CERT_SOURCE_EMBEDDED=y
+CONFIG_OTA_CHECK_ON_BOOT=y
+CONFIG_OTA_CHECK_INTERVAL_MIN=15
+
+# Where log lines go. LOGSHIP_HOSTNAME is what tells one clock from another.
+CONFIG_LOGSHIP_HOST=""
+CONFIG_LOGSHIP_PORT=5514
+CONFIG_LOGSHIP_HOSTNAME=""
