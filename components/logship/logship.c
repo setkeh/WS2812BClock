@@ -17,8 +17,8 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "esp_netif.h"
 #include "esp_timer.h"
+#include "wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -207,34 +207,6 @@ static int log_hook(const char *fmt, va_list args)
     return n;
 }
 
-// Whatever the clock is called on the network is what separates one clock
-// from another in the log stream.
-static const char *device_hostname(void)
-{
-    static char name[32];
-    const char *h = NULL;
-
-    if (name[0]) return name;
-
-    if (strlen(CONFIG_LOGSHIP_HOSTNAME) > 0) {
-        strlcpy(name, CONFIG_LOGSHIP_HOSTNAME, sizeof(name));
-        return name;
-    }
-
-    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (sta && esp_netif_get_hostname(sta, &h) == ESP_OK && h && *h)
-        strlcpy(name, h, sizeof(name));
-    else
-        strlcpy(name, "esp32", sizeof(name));
-
-    for (char *p = name; *p; p++)
-        if (*p == ' ') *p = '-';    // the HOSTNAME field is space-delimited
-    return name;
-}
-
-// The time a line is sent is not the time it happened: boot messages sit in
-// the queue until the network is up, which can be seconds. Stamp them with
-// when they were logged.
 static void timestamp(char *out, size_t cap, const line_t *line)
 {
     struct timeval now;
@@ -314,7 +286,7 @@ static void ship(const line_t *line)
 
     timestamp(ts, sizeof(ts), line);
     int n = snprintf(frame, sizeof(frame) - 1, "<%d>1 %s %s %s - - - %.*s",
-                     SYSLOG_FACILITY * 8 + line->sev, ts, device_hostname(),
+                     SYSLOG_FACILITY * 8 + line->sev, ts, wifi_hostname(),
                      CONFIG_LOGSHIP_APP_NAME, (int)line->len, line->text);
     if (n <= 0) return;
     if (n >= (int)sizeof(frame) - 1) n = sizeof(frame) - 2;

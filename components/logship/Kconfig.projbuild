@@ -29,14 +29,17 @@ menu "WS2812B Clock Remote Logging"
         string "syslog APP-NAME field"
         depends on LOGSHIP_ENABLE
         default "ws2812bclock"
-
-    config LOGSHIP_HOSTNAME
-        string "syslog HOSTNAME field"
-        depends on LOGSHIP_ENABLE
-        default ""
         help
-            Leave blank to use the device's own network hostname, which is
-            what distinguishes one clock from another in the log stream.
+            Names the firmware, not the installation. RFC 5424 uses APP-NAME
+            for the application and HOSTNAME for the machine, so this stays
+            the same across every device running this firmware while the
+            hostname distinguishes them.
+
+            The HOSTNAME field is not configured here: it follows the device's
+            network name, CONFIG_LWIP_LOCAL_HOSTNAME, under
+            Component config -> LWIP -> Local netif hostname. That one value is
+            the device's identity everywhere -- its DHCP lease, its log label
+            and the filename its crash dumps are stored under.
 
     config LOGSHIP_LINE_MAX
         int "Longest log line shipped (bytes)"
