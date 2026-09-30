@@ -65,13 +65,43 @@ All under `idf.py menuconfig`:
 | *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY`, `WIFI_POWER_SAVE` (off: modem sleep costs OTA throughput and log latency for power a mains-powered clock does not need) |
 | *WS2812B Clock NTP* | Server (default `pool.ntp.org`), timezone (default Sydney), sync method |
 | *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot and interval, `OTA_PROGRESS_STEP_PCT`, `OTA_UPLOAD_COREDUMP`, `OTA_CRASH_URL` |
-| *WS2812B Clock Remote Logging* | Collector host and UDP port, syslog APP-NAME and HOSTNAME, line length, queue depth, core dump reporting |
+| *WS2812B Clock Remote Logging* | Collector host and UDP port, syslog APP-NAME, line length, queue depth, core dump reporting |
 | *WS2812B Clock Debugger* | `DEBUG_BUILD` logging, status LED pin |
 | *WS2812B Clock Fans* | Fan PWM pin |
 
 Shipped defaults: ring on GPIO32 (60 px) at 5% day / 1% night, digits on
 GPIO25 (28 px) at 50% day / 5% night. Brightness is worth tuning per build
 once the diffusers are in — the values in a local `sdkconfig` win over these.
+
+### Device identity
+
+One value names the device, and everything follows it:
+
+```
+CONFIG_LWIP_LOCAL_HOSTNAME="AmbersClock"
+```
+
+It is not under any of this project's own menus — it lives in menuconfig under
+**Component config → LWIP → Local netif hostname**, and defaults to
+`espressif`, which is worth changing before a second device exists.
+
+That one setting becomes the DHCP name on the network, the `host` label in
+Loki, and the name a crash dump is filed under on the server. Nothing else
+sets it: `logship` and the crash upload both read it back from the station
+interface through `wifi_hostname()`, so they cannot disagree.
+
+The distinction matters once there is more than one device, and it follows
+RFC 5424:
+
+| Field | Means | Set by | Example |
+| --- | --- | --- | --- |
+| HOSTNAME | which **device** | `CONFIG_LWIP_LOCAL_HOSTNAME` | `AmbersClock` |
+| APP-NAME | which **firmware** | `CONFIG_LOGSHIP_APP_NAME` | `ws2812bclock` |
+
+So every clock running this firmware shares an APP-NAME and has its own
+HOSTNAME. `{app="ws2812bclock"}` selects the fleet; `{host="AmbersClock"}`
+selects one of them. The same shape works for any other device built on this
+pattern.
 
 ### Site-specific settings and backing them up
 
@@ -232,10 +262,8 @@ CONFIG_LOGSHIP_PORT=5514
 The device sends **RFC 5424** frames, one datagram per line, facility `local0`,
 severity taken from the ESP-IDF level letter. Before the first NTP sync the
 timestamp field is `-`, which tells the collector to stamp the line on arrival
-rather than filing boot messages in 1970. The HOSTNAME field is what separates
-one clock from another: it defaults to the device's own network hostname, so
-set that per device (`CONFIG_LWIP_LOCAL_HOSTNAME`) or override it with
-`CONFIG_LOGSHIP_HOSTNAME`.
+rather than filing boot messages in 1970. HOSTNAME is the device and APP-NAME
+is the firmware — see *Device identity* below.
 
 Watch the stream with nothing but netcat, before any collector exists:
 

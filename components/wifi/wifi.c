@@ -7,6 +7,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_timer.h"
 
 #include "wifi.h"
@@ -151,4 +152,14 @@ bool wifi_init_sta(void)
     }
 
     return (bits & WIFI_CONNECTED_BIT) != 0;
+}
+
+const char *wifi_hostname(void)
+{
+    const char *name = NULL;
+    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+    if (sta && esp_netif_get_hostname(sta, &name) == ESP_OK && name && *name)
+        return name;
+    return "unknown";
 }

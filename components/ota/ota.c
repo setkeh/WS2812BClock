@@ -16,7 +16,7 @@
 
 #if CONFIG_OTA_UPLOAD_COREDUMP
 #include "esp_core_dump.h"
-#include "esp_netif.h"
+#include "wifi.h"
 #include "esp_partition.h"
 #endif
 #include "sdkconfig.h"
@@ -271,15 +271,6 @@ void ota_check_async(void)
 // not, so it never exists in RAM all at once.
 #define COREDUMP_CHUNK 1024
 
-static const char *device_hostname(void)
-{
-    const char *h = NULL;
-    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-
-    if (sta && esp_netif_get_hostname(sta, &h) == ESP_OK && h && *h) return h;
-    return "unknown";
-}
-
 static esp_err_t upload_coredump(void)
 {
     size_t addr = 0, size = 0;
@@ -314,7 +305,7 @@ static esp_err_t upload_coredump(void)
 
     add_auth_header(http);
     esp_http_client_set_header(http, "Content-Type", "application/octet-stream");
-    esp_http_client_set_header(http, "X-Device-Hostname", device_hostname());
+    esp_http_client_set_header(http, "X-Device-Hostname", wifi_hostname());
     esp_http_client_set_header(http, "X-Firmware-Version", esp_app_get_description()->version);
     esp_http_client_set_header(http, "X-App-Elf-Sha256", sha);
 
