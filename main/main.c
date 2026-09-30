@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 
 #include "freertos/FreeRTOS.h"
@@ -6,6 +7,8 @@
 #include <sys/time.h>
 
 #include "esp_log.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "sdkconfig.h"
 #include "debug.h"
 #include "fan.h"
@@ -13,10 +16,14 @@
 #include "ntp.h"
 #include "display.h"
 #include "ota.h"
+#include "logship.h"
 
 #include "nvs_flash.h"
 
 static const char *TAG = "clock";
+
+// How often a healthy clock says so. Between these, a working clock is silent.
+#define HEARTBEAT_MIN 5
 static volatile bool s_realign = false;
 static bool s_confirmed_healthy = false;
 
@@ -26,6 +33,20 @@ static bool s_confirmed_healthy = false;
 #else
 #define DEBUG_BUILD 0
 #endif
+
+// A clock that is fine says so every few minutes. The heap figures are what
+// would show a slow leak, and a gap between beats shows a reboot nobody saw.
+static void heartbeat(void)
+{
+    static int64_t next_us = 0;
+    int64_t now = esp_timer_get_time();
+
+    if (now < next_us) return;
+    next_us = now + (int64_t)HEARTBEAT_MIN * 60 * 1000000;
+    ESP_LOGI(TAG, "alive: up %llu s, free heap %" PRIu32 ", low water %" PRIu32,
+             (unsigned long long)(now / 1000000),
+             esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
+}
 
 // Sleep until just after the next full second of the real clock
 static void wait_for_next_second(void)
@@ -66,6 +87,11 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
+    // Capturing starts before WiFi, so the connection attempt itself ends up in
+    // the log stream. Sending cannot start until the TCP/IP stack exists, so
+    // that half waits for logship_start() below.
+    logship_init();
+
     ESP_ERROR_CHECK(display_init());
     display_show_waiting();
 
@@ -73,12 +99,21 @@ void app_main(void) {
         ESP_LOGW(TAG, "WiFi not up yet, will keep retrying in the background");
     }
 
+    // Only now is lwip up. Resolving the collector's name before this point
+    // asserts inside lwip, because its mailbox does not exist yet.
+    logship_start();
+
+    // After the sender exists, so a crash report from the last boot actually
+    // gets off the device.
+    logship_report_coredump();
+
     ESP_ERROR_CHECK(esp_event_handler_register(NTP_EVENT, NTP_EVENT_SYNCED, on_ntp_synced, NULL));
  
     ntp_init();
 
     wait_for_next_second();
     TickType_t last_wake = xTaskGetTickCount();
+    int waiting = 0;
 
     while (true) {
         if (ntp_time_is_valid()) {
@@ -96,13 +131,20 @@ void app_main(void) {
                 ota_check_async();              // own task: TLS needs more stack than main has
 #endif
             }
-            strftime(zone, sizeof(zone), "%Z", &local);
-            strftime(buf, sizeof(buf), "%H:%M:%S", &local);
-            // Show milliseconds while testing i can see the alignment working
-            ESP_LOGI(TAG, "tick %s.%03ld %s", buf, (long)(tv.tv_usec / 1000), zone);
+            if (DEBUG_BUILD) {
+                // Milliseconds show the tick staying aligned to the real
+                // second. One line a second is far too much to ship, so this
+                // is the sort of thing the debug flag exists to compile out.
+                strftime(zone, sizeof(zone), "%Z", &local);
+                strftime(buf, sizeof(buf), "%H:%M:%S", &local);
+                ESP_LOGI(TAG, "tick %s.%03ld %s", buf, (long)(tv.tv_usec / 1000), zone);
+            }
+            heartbeat();
         } else {
             display_show_waiting();
-            ESP_LOGI(TAG, "tick: waiting for first NTP sync");
+            // A state, not an event: report it every 30 s, not every tick.
+            if (waiting++ % 30 == 0)
+                ESP_LOGW(TAG, "waiting for the first NTP sync");
         }
 
         if (s_realign) {

@@ -1,0 +1,71 @@
+menu "WS2812B Clock Remote Logging"
+
+    config LOGSHIP_ENABLE
+        bool "Ship log lines over the network"
+        default n
+        help
+            Copy every log line to a syslog collector over UDP, so the clock
+            can be watched without a serial cable. Sending never blocks the
+            task that logged: lines are queued and a sender task posts them.
+
+    config LOGSHIP_HOST
+        string "Collector hostname or IP"
+        depends on LOGSHIP_ENABLE
+        default ""
+        help
+            Where to send syslog datagrams. A name is resolved once and
+            re-resolved if sending starts to fail.
+
+    config LOGSHIP_PORT
+        int "Collector UDP port"
+        depends on LOGSHIP_ENABLE
+        range 1 65535
+        default 5514
+        help
+            514 is the well-known syslog port, but binding it needs root on
+            the collector; 5514 is the usual unprivileged stand-in.
+
+    config LOGSHIP_APP_NAME
+        string "syslog APP-NAME field"
+        depends on LOGSHIP_ENABLE
+        default "ws2812bclock"
+
+    config LOGSHIP_HOSTNAME
+        string "syslog HOSTNAME field"
+        depends on LOGSHIP_ENABLE
+        default ""
+        help
+            Leave blank to use the device's own network hostname, which is
+            what distinguishes one clock from another in the log stream.
+
+    config LOGSHIP_LINE_MAX
+        int "Longest log line shipped (bytes)"
+        depends on LOGSHIP_ENABLE
+        range 128 1024
+        default 192
+        help
+            Longer lines are truncated. This is also the per-slot cost of the
+            queue below, so the two together set how much RAM logging uses.
+
+    config LOGSHIP_QUEUE_DEPTH
+        int "Lines held while the link is down"
+        depends on LOGSHIP_ENABLE
+        range 4 128
+        default 32
+        help
+            Lines queue up until the collector is reachable, so the boot
+            messages survive the wait for WiFi. Once it is full the newest
+            lines are dropped and a count of them is sent later.
+
+    config LOGSHIP_REPORT_COREDUMP
+        bool "Report a stored core dump on boot"
+        depends on ESP_COREDUMP_ENABLE_TO_FLASH && ESP_COREDUMP_DATA_FORMAT_ELF
+        default y
+        help
+            After a crash, log the faulting task, the program counter, the
+            exception cause and a backtrace. That goes out over the network
+            like any other log line, so a crash can be diagnosed without
+            plugging the clock in. The dump itself stays in flash for
+            "idf.py coredump-info".
+
+endmenu

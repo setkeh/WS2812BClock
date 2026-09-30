@@ -65,6 +65,7 @@ All under `idf.py menuconfig`:
 | *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY` |
 | *WS2812B Clock NTP* | Server (default `pool.ntp.org`), timezone (default Sydney), sync method |
 | *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot |
+| *WS2812B Clock Remote Logging* | Collector host and UDP port, syslog APP-NAME and HOSTNAME, line length, queue depth, core dump reporting |
 | *WS2812B Clock Debugger* | `DEBUG_BUILD` logging, status LED pin |
 | *WS2812B Clock Fans* | Fan PWM pin |
 
@@ -191,6 +192,79 @@ at the one matching the target.
 Losing the signing key means signed clocks stop accepting updates and must be
 reflashed over USB. It lives in 1Password; keep that recoverable.
 
+## Remote logging
+
+A clock on a wall has no serial cable, so every log line is also copied to a
+syslog collector over UDP. Set the collector in `idf.py menuconfig` →
+*WS2812B Clock Remote Logging*; with no host configured the component does
+nothing and costs nothing.
+
+```
+CONFIG_LOGSHIP_HOST="logs.example.lan"
+CONFIG_LOGSHIP_PORT=5514
+```
+
+The device sends **RFC 5424** frames, one datagram per line, facility `local0`,
+severity taken from the ESP-IDF level letter. Before the first NTP sync the
+timestamp field is `-`, which tells the collector to stamp the line on arrival
+rather than filing boot messages in 1970. The HOSTNAME field is what separates
+one clock from another: it defaults to the device's own network hostname, so
+set that per device (`CONFIG_LWIP_LOCAL_HOSTNAME`) or override it with
+`CONFIG_LOGSHIP_HOSTNAME`.
+
+Watch the stream with nothing but netcat, before any collector exists:
+
+```bash
+nc -ul 5514
+```
+
+Frames end in a newline (RFC 6587 non-transparent framing). Receivers choose
+their parser from the first byte — `<` means newline-delimited — and then treat
+the datagrams from one sender as a single stream, so the terminator is what
+keeps consecutive messages apart.
+
+For promtail, which is what this setup uses, the scrape config is:
+
+```yaml
+scrape_configs:
+  - job_name: ws2812bclock
+    syslog:
+      listen_address: 0.0.0.0:5514
+      listen_protocol: udp          # defaults to tcp
+      use_incoming_timestamp: true
+      labels:
+        job: ws2812bclock
+    relabel_configs:
+      - source_labels: [__syslog_message_hostname]
+        target_label: host
+      - source_labels: [__syslog_message_severity]
+        target_label: level
+      - source_labels: [__syslog_message_app_name]
+        target_label: app
+```
+
+The `relabel_configs` are not optional: promtail drops every `__`-prefixed
+label, so without them the logs arrive with no hostname and no severity and
+one clock cannot be told from another.
+
+### What it costs, and what it drops
+
+The log hook runs on whichever task called `ESP_LOGx`, so it never sends
+anything itself: it formats the line, copies it into a queue and returns. A
+sender task does the network work. If the collector is unreachable the lines
+stay queued — so the boot messages survive the wait for WiFi — and once the
+queue is full the newest lines are dropped and counted, with the count sent
+once the link comes back. The clock never blocks or stalls because logging
+cannot get out.
+
+The queue is the only real cost: `LOGSHIP_QUEUE_DEPTH` x `LOGSHIP_LINE_MAX`
+from the heap (about 6 KB at the defaults) plus a 4 KB sender task.
+
+Volume is controlled by `DEBUG_BUILD`, which is what it is for. With it set,
+the tick loop logs once a second, which is far too much to ship. With it
+clear, a working clock is nearly silent: a heartbeat every five minutes with
+uptime and heap figures, plus whatever actually goes wrong.
+
 ## Core dumps
 
 Panic output goes straight to the UART as the chip resets, so on a wall-mounted
@@ -209,7 +283,15 @@ Debug builds accept **`crash`** typed on the serial console, which calls
 fault. The command lives in the UART receive task, which only exists when
 `DEBUG_BUILD` is set, so a release build does not have it.
 
-Shipping dumps off the device over WiFi is issue #17.
+After a crash, the next boot logs the dump's summary — faulting task, program
+counter, `EXCCAUSE`, and a backtrace — once the network is up, so it arrives at
+the collector like any other log line and the clock never has to be unplugged
+to find out what happened. Paste the backtrace into `addr2line` against the
+matching build, which the report identifies by its app ELF SHA256.
+
+The dump itself stays in flash; uploading the whole ELF needs an endpoint to
+receive it, which is not built yet. `idf.py coredump-info` over USB is still
+the way to get a full symbolised trace with every task's stack.
 
 ## Layout
 
@@ -220,6 +302,7 @@ components/
 ├── wifi/      station mode, retries forever with back-off
 ├── ota/       manifest check, HTTPS update, rollback handling
 ├── fan/       LEDC PWM fan control with kick-start
+├── logship/   syslog-over-UDP log shipping, crash reports on boot
 └── debug/     activity LED on serial traffic
 main/          startup, the second-aligned tick loop, rendering
 CAD/           jigs, clock geometry, KiCad project
