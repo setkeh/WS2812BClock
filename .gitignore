@@ -27,6 +27,10 @@
 # Fortran module files
 *.mod
 *.smod
+# ...which also matches go.mod, and did: server/crashd/go.mod was silently
+# left out of its first commit and both workflows failed on it.
+!go.mod
+!go.sum
 
 # Compiled Static libraries
 *.lai
