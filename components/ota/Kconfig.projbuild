@@ -58,4 +58,14 @@ menu "WS2812B Clock OTA"
             Each check is one small HTTPS request for latest.json, so a short
             interval is cheap. An update installs and reboots immediately.
 
+    config OTA_PROGRESS_STEP_PCT
+        int "Log download progress every N percent"
+        range 1 50
+        default 10
+        help
+            An image is most of a megabyte and a weak link can take minutes to
+            fetch it, so without progress there is no way to tell a slow
+            download from a stuck one. Ten percent is about nine lines per
+            update, which is enough to see movement without flooding the log.
+
 endmenu
