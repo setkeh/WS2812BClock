@@ -1,0 +1,44 @@
+name: Release crashd
+
+# Tagged separately from the firmware, which is versioned through
+# CONFIG_APP_PROJECT_VER rather than git tags. Push a tag like crashd-v1.0.0.
+on:
+  push:
+    tags: ['crashd-v*']
+
+permissions:
+  contents: write     # needed to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/crashd/go.mod
+          cache: false
+
+      - name: Build
+        working-directory: server/crashd
+        # Static, so the target host needs no Go toolchain and no libc match.
+        # -trimpath keeps build paths out of the binary.
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -trimpath \
+              -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+              -o crashd-linux-amd64 .
+          sha256sum crashd-linux-amd64 > crashd-linux-amd64.sha256
+
+      - name: Publish
+        working-directory: server/crashd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # gh rather than a third-party action: one less thing in the supply
+        # chain for a binary that ends up running on the monitoring host.
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Core dump receiver for the WS2812B clocks. Static linux/amd64 binary; verify against the .sha256 file." \
+            crashd-linux-amd64 crashd-linux-amd64.sha256

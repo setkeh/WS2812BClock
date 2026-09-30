@@ -20,3 +20,12 @@ esp_err_t ota_update_now(void);
 // Run ota_update_now() on its own task with enough stack for TLS, and return
 // immediately. This is what callers on the main task should use.
 void ota_check_async(void);
+
+// If the previous boot left a core dump in flash, send it to the crash
+// receiver and erase it once the server has taken it. Does nothing when there
+// is no dump, or when uploading is not configured.
+//
+// Runs on its own task: this is a TLS connection, which needs far more stack
+// than the caller is likely to have. Call it once the network is up, and only
+// after the summary has been logged -- a successful upload erases the dump.
+void ota_upload_coredump_async(void);

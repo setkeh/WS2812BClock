@@ -68,4 +68,26 @@ menu "WS2812B Clock OTA"
             download from a stuck one. Ten percent is about nine lines per
             update, which is enough to see movement without flooding the log.
 
+    config OTA_UPLOAD_COREDUMP
+        bool "Upload core dumps to the server"
+        depends on ESP_COREDUMP_ENABLE_TO_FLASH
+        default n
+        help
+            After a crash, send the stored dump to the crash receiver and
+            erase it once the server has taken it. The summary logged at boot
+            covers most diagnosis; this is for the cases where the full dump,
+            with every task's stack, is what you need.
+
+            Erasing only on success makes it exactly-once and self-limiting:
+            a device that cannot reach the server keeps its dump and retries
+            on the next boot.
+
+    config OTA_CRASH_URL
+        string "Crash receiver endpoint (https://.../crash)"
+        depends on OTA_UPLOAD_COREDUMP
+        default ""
+        help
+            The model directory is appended, so this is the endpoint without
+            it. Uses the same token and certificate as update checks.
+
 endmenu

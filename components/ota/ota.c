@@ -13,6 +13,12 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
+
+#if CONFIG_OTA_UPLOAD_COREDUMP
+#include "esp_core_dump.h"
+#include "esp_netif.h"
+#include "esp_partition.h"
+#endif
 #include "sdkconfig.h"
 
 static const char *TAG = "ota";
@@ -258,3 +264,136 @@ void ota_check_async(void)
     if (xTaskCreate(ota_task, "ota_check", OTA_TASK_STACK, NULL, 5, NULL) != pdPASS)
         ESP_LOGE(TAG, "could not start the update task");
 }
+
+#if CONFIG_OTA_UPLOAD_COREDUMP
+
+// Read and posted in chunks: the dump is tens of kilobytes and the heap is
+// not, so it never exists in RAM all at once.
+#define COREDUMP_CHUNK 1024
+
+static const char *device_hostname(void)
+{
+    const char *h = NULL;
+    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+    if (sta && esp_netif_get_hostname(sta, &h) == ESP_OK && h && *h) return h;
+    return "unknown";
+}
+
+static esp_err_t upload_coredump(void)
+{
+    size_t addr = 0, size = 0;
+
+    esp_err_t err = esp_core_dump_image_get(&addr, &size);
+    if (err == ESP_ERR_NOT_FOUND || size == 0) return ESP_OK;   // clean boot
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "core dump present but unreadable: %s", esp_err_to_name(err));
+        return err;
+    }
+    if (strlen(CONFIG_OTA_CRASH_URL) == 0) {
+        ESP_LOGW(TAG, "core dump stored but no crash receiver configured");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    const esp_partition_t *part = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
+    if (!part) return ESP_ERR_NOT_FOUND;
+
+    char url[URL_MAX];
+    snprintf(url, sizeof(url), "%s/%s", CONFIG_OTA_CRASH_URL, CONFIG_OTA_MODEL);
+
+    esp_http_client_config_t cfg;
+    fill_http_config(&cfg, url);
+    cfg.method = HTTP_METHOD_POST;
+
+    esp_http_client_handle_t http = esp_http_client_init(&cfg);
+    if (!http) return ESP_FAIL;
+
+    char sha[65] = {0};
+    esp_app_get_elf_sha256(sha, sizeof(sha));
+
+    add_auth_header(http);
+    esp_http_client_set_header(http, "Content-Type", "application/octet-stream");
+    esp_http_client_set_header(http, "X-Device-Hostname", device_hostname());
+    esp_http_client_set_header(http, "X-Firmware-Version", esp_app_get_description()->version);
+    esp_http_client_set_header(http, "X-App-Elf-Sha256", sha);
+
+    uint8_t *buf = malloc(COREDUMP_CHUNK);
+    if (!buf) {
+        esp_http_client_cleanup(http);
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "uploading %u byte core dump to %s", (unsigned)size, url);
+
+    // Declaring the length up front makes this a plain content-length POST
+    // rather than a chunked one, which keeps the receiver trivial.
+    err = esp_http_client_open(http, (int)size);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "crash upload could not connect: %s", esp_err_to_name(err));
+        goto done;
+    }
+
+    // The dump starts at the beginning of its partition; offsets are relative
+    // to the partition, while esp_core_dump_image_get reports a flash address.
+    size_t base = addr - part->address;
+    for (size_t sent = 0; sent < size; ) {
+        size_t n = size - sent;
+        if (n > COREDUMP_CHUNK) n = COREDUMP_CHUNK;
+
+        err = esp_partition_read(part, base + sent, buf, n);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "reading the dump failed at %u: %s", (unsigned)sent, esp_err_to_name(err));
+            goto done;
+        }
+        int wrote = esp_http_client_write(http, (const char *)buf, n);
+        if (wrote < 0) {
+            ESP_LOGE(TAG, "crash upload failed after %u of %u bytes", (unsigned)sent, (unsigned)size);
+            err = ESP_FAIL;
+            goto done;
+        }
+        sent += wrote;
+    }
+
+    esp_http_client_fetch_headers(http);
+    int status = esp_http_client_get_status_code(http);
+
+    // Erase only on success, which makes this exactly-once: a device that
+    // cannot reach the server keeps its dump and tries again next boot.
+    if (status == 200 || status == 201) {
+        ESP_LOGI(TAG, "core dump accepted, erasing it from flash");
+        esp_err_t erased = esp_core_dump_image_erase();
+        if (erased != ESP_OK)
+            ESP_LOGW(TAG, "could not erase the dump: %s", esp_err_to_name(erased));
+        err = ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "crash receiver returned HTTP %d; keeping the dump", status);
+        err = ESP_FAIL;
+    }
+
+done:
+    free(buf);
+    esp_http_client_close(http);
+    esp_http_client_cleanup(http);
+    return err;
+}
+
+#define CRASH_TASK_STACK 8192
+
+static void crash_task(void *arg)
+{
+    upload_coredump();
+    vTaskDelete(NULL);
+}
+
+void ota_upload_coredump_async(void)
+{
+    if (xTaskCreate(crash_task, "crash_up", CRASH_TASK_STACK, NULL, 4, NULL) != pdPASS)
+        ESP_LOGE(TAG, "could not start the crash upload task");
+}
+
+#else  /* !CONFIG_OTA_UPLOAD_COREDUMP */
+
+void ota_upload_coredump_async(void) { }
+
+#endif
