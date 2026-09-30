@@ -64,7 +64,7 @@ All under `idf.py menuconfig`:
 | *WS2812B Clock Display* | Ring and digit GPIOs and pixel counts, day/night brightness for each, night window (default 19:00–06:00), time/date alternation |
 | *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY`, `WIFI_POWER_SAVE` (off: modem sleep costs OTA throughput and log latency for power a mains-powered clock does not need) |
 | *WS2812B Clock NTP* | Server (default `pool.ntp.org`), timezone (default Sydney), sync method |
-| *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot and interval, `OTA_PROGRESS_STEP_PCT` |
+| *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot and interval, `OTA_PROGRESS_STEP_PCT`, `OTA_UPLOAD_COREDUMP`, `OTA_CRASH_URL` |
 | *WS2812B Clock Remote Logging* | Collector host and UDP port, syslog APP-NAME and HOSTNAME, line length, queue depth, core dump reporting |
 | *WS2812B Clock Debugger* | `DEBUG_BUILD` logging, status LED pin |
 | *WS2812B Clock Fans* | Fan PWM pin |
@@ -314,9 +314,11 @@ the collector like any other log line and the clock never has to be unplugged
 to find out what happened. Paste the backtrace into `addr2line` against the
 matching build, which the report identifies by its app ELF SHA256.
 
-The dump itself stays in flash; uploading it needs an endpoint to receive it,
-which is not built yet. `idf.py coredump-info` over USB is still the way to get
-a full symbolised trace with every task's stack.
+With `OTA_UPLOAD_COREDUMP` set, the dump itself is then posted to the crash
+receiver in `server/crashd` and erased once the server has taken it. Erasing
+only on success makes it exactly-once: a clock that cannot reach the server
+keeps its dump and retries on the next boot. Without it the dump stays in flash
+and `idf.py coredump-info` over USB is the way to get a full trace.
 
 ### Symbols are published with every release
 
@@ -353,4 +355,5 @@ components/
 main/          startup, the second-aligned tick loop, rendering
 CAD/           jigs, clock geometry, KiCad project
 scripts/       signing key and release helpers
+server/crashd/ core dump receiver, deployed beside the OTA server
 ```

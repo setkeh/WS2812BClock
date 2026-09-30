@@ -107,6 +107,10 @@ void app_main(void) {
     // gets off the device.
     logship_report_coredump();
 
+    // Then ship the dump itself, if that is configured. Strictly after the
+    // summary above: a successful upload erases the dump.
+    ota_upload_coredump_async();
+
     ESP_ERROR_CHECK(esp_event_handler_register(NTP_EVENT, NTP_EVENT_SYNCED, on_ntp_synced, NULL));
  
     ntp_init();

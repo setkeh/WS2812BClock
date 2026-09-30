@@ -13,4 +13,4 @@ endif()
 idf_component_register(SRCS "ota.c"
                        INCLUDE_DIRS "include"
                        EMBED_TXTFILES ${ota_embed}
-                       PRIV_REQUIRES app_update esp_https_ota esp_http_client esp-tls esp_timer nvs_flash json)
+                       PRIV_REQUIRES app_update esp_https_ota esp_http_client esp-tls esp_timer esp_netif espcoredump esp_partition nvs_flash json)

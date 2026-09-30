@@ -112,6 +112,10 @@
             idf
             pkgs.fish
             pkgs.gh
+            # server/crashd, the core dump receiver that runs beside the OTA
+            # server. Nothing to do with the firmware build, but it lives in
+            # this repository because its wire format is the firmware's.
+            pkgs.go
           ];
 
           shellHook = ''
