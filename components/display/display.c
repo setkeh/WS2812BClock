@@ -55,7 +55,7 @@ static const rgb_t COLOUR_HOUR   = { 255,   0,   0 };   // red
 static const rgb_t COLOUR_MINUTE = { 140,   0, 255 };   // violet
 static const rgb_t COLOUR_SECOND = {   0, 255,   0 };   // green
 static const rgb_t COLOUR_MARK   = {  60,  40,   0 };   // dim amber hour marks
-static const rgb_t COLOUR_DIGIT  = { 128,   60, 255 };   // purple
+static const rgb_t COLOUR_DIGIT  = { 255, 255, 255 };   // White
 
 static led_strip_handle_t s_ring;
 static led_strip_handle_t s_seg;
