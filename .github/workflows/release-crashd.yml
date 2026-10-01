@@ -36,7 +36,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         # gh rather than a third-party action: one less thing in the supply
-        # chain for a binary that ends up running on the monitoring host.
+        # chain for a binary that ends up running on a server.
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \

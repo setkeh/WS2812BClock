@@ -3,7 +3,8 @@
 // It exists because a core dump is an opaque binary that has to arrive intact,
 // which rules out the lossy syslog path the clocks use for everything else.
 // It deliberately does not use a general-purpose upload module: this endpoint
-// is reachable from the IoT VLAN, and the only thing it is allowed to do is
+// is reachable from the network the devices are on, and the only thing it is
+// allowed to do is
 // create one new file per crash, under a name it chooses itself.
 //
 //	POST /crash/{model}
@@ -62,7 +63,7 @@ func main() {
 	// The coredump partition is 64 KB, so anything approaching twice that is
 	// not a dump. Refusing early keeps a bad actor from streaming to disk.
 	if *tokenFile == "" {
-		log.Fatal("crashd: -token-file is required; the endpoint is reachable from the IoT VLAN")
+		log.Fatal("crashd: -token-file is required; this endpoint is reachable from the device network")
 	}
 	raw, err := os.ReadFile(*tokenFile)
 	if err != nil {

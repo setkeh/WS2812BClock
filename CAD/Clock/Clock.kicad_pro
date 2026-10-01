@@ -488,7 +488,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "AmbersClock.kicad_pro",
+    "filename": "Clock.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -643,7 +643,7 @@
     "subpart_id_separator": 0,
     "top_level_sheets": [
       {
-        "filename": "AmbersClock.kicad_sch",
+        "filename": "Clock.kicad_sch",
         "name": "Root",
         "uuid": "57d06451-c67b-46a4-abe3-bcdfd528483e"
       }

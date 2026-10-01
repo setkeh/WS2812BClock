@@ -3475,7 +3475,7 @@
 			(uuid "b736a61c-e52a-472e-bd9e-3e3fc843d9f9")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D1")
 					(unit 1)
@@ -3555,7 +3555,7 @@
 			(uuid "2e6a90e1-1726-40f9-8b91-3c90eca8236a")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "R3")
 					(unit 1)
@@ -3640,7 +3640,7 @@
 			(uuid "698d7ff8-6b05-4622-b851-9742f258e1e1")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "M2")
 					(unit 1)
@@ -3722,7 +3722,7 @@
 			(uuid "8b9cfe4f-718d-48d1-9272-a96875f9ee25")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "R2")
 					(unit 1)
@@ -3810,7 +3810,7 @@
 			(uuid "8ace9c1d-f389-4af9-b611-d625b21d68cd")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D3")
 					(unit 1)
@@ -3898,7 +3898,7 @@
 			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef1437f")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D4")
 					(unit 1)
@@ -3986,7 +3986,7 @@
 			(uuid "8ace9c1d-f389-4af9-b611-d625b21d68cd")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D2")
 					(unit 1)
@@ -4068,7 +4068,7 @@
 			(uuid "8b9cfe4f-718d-48d1-9272-a96875f9ee25")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "R1")
 					(unit 1)
@@ -4146,7 +4146,7 @@
 			(uuid "6e577037-0cdc-4f83-8dfb-daabf15cabe6")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "#PWR01")
 					(unit 1)
@@ -4228,7 +4228,7 @@
 			(uuid "5800ed47-0c74-473c-90b9-2bfa56f8c193")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "C1")
 					(unit 1)
@@ -4384,7 +4384,7 @@
 			(uuid "e54f0601-b693-4152-acaa-4cd30185ff24")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "U2")
 					(unit 1)
@@ -4462,7 +4462,7 @@
 			(uuid "fc00ac40-a64d-49fe-8e03-2f47d8604c5f")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "#PWR02")
 					(unit 1)
@@ -4550,7 +4550,7 @@
 			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef1437f")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D5")
 					(unit 1)
@@ -4635,7 +4635,7 @@
 			(uuid "698d7ff8-6b05-4622-b851-9742f258e1e1")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "M1")
 					(unit 1)
@@ -4723,7 +4723,7 @@
 			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef1437f")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D6")
 					(unit 1)
@@ -4916,7 +4916,7 @@
 			(uuid "b31158db-ddb0-4348-975a-92b8ff34c4fe")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "U1")
 					(unit 1)
@@ -5004,7 +5004,7 @@
 			(uuid "6a4133ad-17bd-4477-9915-f7d19006c3e0")
 		)
 		(instances
-			(project "AmbersClock"
+			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "U3")
 					(unit 1)
