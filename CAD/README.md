@@ -126,9 +126,51 @@ so keep the iron at 280–300 °C and each joint to 1–2 s; PETG would have mor
   2–4 on the digits. 1000 µF bulk at the regulator.
 - Full-white current for 88 pixels is ~5 A; cap brightness in firmware (25 % ≈ 1.3 A).
 
+## Data line level: the diodes on the power feeds
+
+The SK6812 needs a logic high of at least **0.7 x VDD**. The regulator measures
+**5.04 V**, which puts the threshold at **3.53 V**, and the ESP32 drives **3.3 V**.
+The data line is therefore below specification on this build, and has behaved
+accordingly: intermittent wrong-coloured pixels on both chains, and on 2026-10-01 the
+seven-segment chain latched a corrupted frame and stopped accepting data entirely
+until power was removed for a minute. Firmware was ruled out — all 28 segment pixels
+are rewritten every second — and so was a broken connection, since a power cycle
+restored it without anything being touched. See issue #36.
+
+The fix on this hand-wired build is a **1N4007 in series with each of the twelve 5 V
+injection points**, dropping the LED supply to roughly 4.0–4.3 V:
+
+| Load | LED VDD | Threshold (0.7 x VDD) | ESP32 drives |
+| --- | --- | --- | --- |
+| Low (normal brightness) | ~4.34 V | 3.04 V | 3.3 V |
+| Heavy (bright effects) | ~4.04 V | 2.83 V | 3.3 V |
+
+The margin improves under load, because a diode's forward drop rises with current.
+Both figures stay inside the SK6812's 3.5–5.5 V supply range.
+
+All twelve feeds get a diode rather than one, so brightness stays uniform across the
+ring and digits; the overall loss is retuned with the brightness percentages in
+menuconfig. A single diode on the first LED's VDD alone would also work — that LED
+then outputs ~4.3 V, satisfying every LED after it — but it leaves one pixel visibly
+dimmer, which on a seven-segment digit is one dim segment.
+
+**A lower-drop diode is the wrong instinct here.** A Schottky at ~0.4 V leaves VDD at
+~4.64 V and the threshold at 3.25 V, which is almost exactly what the ESP32 drives and
+no better than the present situation. Two diodes in series overshoot the other way:
+~3.6 V supply is only 0.1 V above the minimum. Around 0.7–1.0 V of drop is the useful
+range, which is what an ordinary silicon rectifier gives.
+
+Worth measuring once fitted: the supply at the LED furthest from an injection point
+during a full-white test, confirming it stays above 3.5 V, and the diode temperature
+during a bright animation, since current does not divide evenly between twelve feeds.
+
 ## If this gets rebuilt
 
 A custom PCB ring at the same R160 / 6° geometry would replace both the jig and the
 hand-wiring, with solderable pads, a ground plane and proper per-pixel decoupling.
+It should also carry a **74AHCT125 or 74HCT245 level shifter** on the data lines,
+which is the correct fix for the threshold problem above and makes the twelve diodes
+unnecessary. It must be an AHCT or HCT part: an HC part needs 3.5 V for a logic high
+on a 5 V supply and would change nothing.
 The coordinates above drive it directly — KiCad's Python console can place the 88
 footprints from the same angles and offsets rather than positioning them by hand.
