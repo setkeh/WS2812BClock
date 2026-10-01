@@ -78,7 +78,7 @@ once the diffusers are in — the values in a local `sdkconfig` win over these.
 One value names the device, and everything follows it:
 
 ```
-CONFIG_LWIP_LOCAL_HOSTNAME="AmbersClock"
+CONFIG_LWIP_LOCAL_HOSTNAME="hallway-clock"
 ```
 
 It is not under any of this project's own menus — it lives in menuconfig under
@@ -95,11 +95,11 @@ RFC 5424:
 
 | Field | Means | Set by | Example |
 | --- | --- | --- | --- |
-| HOSTNAME | which **device** | `CONFIG_LWIP_LOCAL_HOSTNAME` | `AmbersClock` |
+| HOSTNAME | which **device** | `CONFIG_LWIP_LOCAL_HOSTNAME` | `hallway-clock` |
 | APP-NAME | which **firmware** | `CONFIG_LOGSHIP_APP_NAME` | `ws2812bclock` |
 
 So every clock running this firmware shares an APP-NAME and has its own
-HOSTNAME. `{app="ws2812bclock"}` selects the fleet; `{host="AmbersClock"}`
+HOSTNAME. `{app="ws2812bclock"}` selects the fleet; `{host="hallway-clock"}`
 selects one of them. The same shape works for any other device built on this
 pattern.
 
@@ -276,7 +276,7 @@ their parser from the first byte — `<` means newline-delimited — and then tr
 the datagrams from one sender as a single stream, so the terminator is what
 keeps consecutive messages apart.
 
-For promtail, which is what this setup uses, the scrape config is:
+Any syslog receiver works. As an example, a promtail scrape config:
 
 ```yaml
 scrape_configs:
@@ -296,9 +296,13 @@ scrape_configs:
         target_label: app
 ```
 
-The `relabel_configs` are not optional: promtail drops every `__`-prefixed
-label, so without them the logs arrive with no hostname and no severity and
-one clock cannot be told from another.
+The relabelling is not optional, whichever receiver you use: both promtail and
+Alloy drop every `__`-prefixed label, so without it the logs arrive with no
+hostname and no severity and one clock cannot be told from another. Alloy's
+`loki.source.syslog` takes the same settings under different names — `address`
+and `protocol` rather than `listen_address` and `listen_protocol` — and moves
+relabelling to a `relabel_rules` attribute, so the config is not a
+transliteration.
 
 ### What it costs, and what it drops
 
@@ -386,7 +390,8 @@ at the far end to catch it.
 Caddy's standard build has no upload handler, so this would mean rebuilding it
 with `xcaddy` and a WebDAV module. That was rejected deliberately.
 
-The endpoint is reachable from the IoT VLAN. Firmware images are signed, so
+The endpoint is reachable from the network the devices are on. Firmware
+images are signed, so
 nobody can install a malicious one — but **`latest.json` is not signed**, and
 anything that can write to the firmware tree can pin the whole fleet to an old
 version or simply fill the disk. Scoping a general-purpose write module
@@ -432,11 +437,11 @@ tag — tagged separately from the firmware, which is versioned through
 `linux/amd64` binary with a `.sha256` beside it. The host needs no Go
 toolchain.
 
-It runs on the monitoring host beside the OTA server, deployed by Salt from the
-infrastructure repository. **This repository owns the code and the wire format;
-the infrastructure repository owns how it runs** — the systemd unit, the Caddy
-route, directory ownership. The split is deliberate: the receiver's contract is
-the firmware's, so those two change together, in one commit, here.
+It runs alongside the update server, deployed by whatever manages that host.
+**This repository owns the code and the wire format; the infrastructure that
+hosts it owns how it runs** — the service unit, the reverse proxy route,
+directory ownership. The split is deliberate: the receiver's contract is the
+firmware's, so those two change together, in one commit, here.
 
 The one constraint that matters when deploying it: its storage directory must
 not sit under the firmware tree, and the unit should have no write access to

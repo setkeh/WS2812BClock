@@ -2,14 +2,15 @@
 
 Receives ESP32 core dumps from the clocks and writes them to disk.
 
-It lives in this repository rather than the infrastructure one because its wire
+It lives beside the firmware rather than with the deployment because its wire
 format *is* the firmware's: the two change together, so they version together.
-The infrastructure repository owns how it runs — the systemd unit, the Caddy
-route, directory ownership and the firewall.
+Whatever hosts it owns how it runs — the service unit, the reverse proxy route,
+directory ownership and the firewall.
 
 ## Why not a general-purpose upload module
 
-This endpoint is reachable from the IoT VLAN. The firmware images it sits
+This endpoint is reachable from the network the devices are on. The firmware
+images it sits
 beside are signed, so nobody can install a malicious one — but `latest.json` is
 **not** signed, and anything with write access to that tree can pin the fleet to
 an old version or fill the disk. A WebDAV module scoped tightly enough to
