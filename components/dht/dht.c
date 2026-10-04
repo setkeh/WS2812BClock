@@ -170,6 +170,17 @@ static void dht_task(void *arg)
 
 void dht_init(void)
 {
+    // Hand the pad to the digital GPIO matrix before touching it. This matters
+    // more than it looks: GPIO32 and GPIO33 are the 32 kHz crystal pads
+    // (32K_XP and 32K_XN) and come out of reset routed to the RTC mux, where
+    // gpio_set_direction() and gpio_set_level() do nothing at all. Without
+    // this the start pulse never reaches the wire, the sensor never answers,
+    // and it looks exactly like an unpowered or miswired part.
+    //
+    // The LED chain on GPIO32 escapes this only because the RMT driver
+    // configures its own pin.
+    gpio_reset_pin(DHT_GPIO);
+
     // The external pull-up does the real work; this is a backstop so a missing
     // resistor shows up as flaky readings rather than nothing at all.
     gpio_set_pull_mode(DHT_GPIO, GPIO_PULLUP_ONLY);
