@@ -168,6 +168,34 @@ static void dht_task(void *arg)
     }
 }
 
+// Can we actually move this line? Driving it low and reading back separates a
+// pin that cannot pull down -- damaged, or held up by something stronger --
+// from a sensor that simply is not answering. In the protocol itself those two
+// are indistinguishable: both leave the line sitting high.
+static void check_line(void)
+{
+    gpio_set_direction(DHT_GPIO, GPIO_MODE_INPUT_OUTPUT);
+    gpio_set_level(DHT_GPIO, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    int driven = gpio_get_level(DHT_GPIO);
+
+    gpio_set_direction(DHT_GPIO, GPIO_MODE_INPUT);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    int released = gpio_get_level(DHT_GPIO);
+
+    if (driven != 0) {
+        ESP_LOGE(TAG, "GPIO%d will not go low when driven. The pin cannot pull the "
+                      "line down, or something is holding it up. The sensor is never "
+                      "seeing a start pulse.", DHT_GPIO);
+    } else if (released != 1) {
+        ESP_LOGE(TAG, "GPIO%d stays low when released: nothing is pulling the line "
+                      "up. Check the pull-up and the sensor's supply.", DHT_GPIO);
+    } else {
+        ESP_LOGI(TAG, "GPIO%d drives low and releases high, so the start pulse is "
+                      "reaching the wire", DHT_GPIO);
+    }
+}
+
 void dht_init(void)
 {
     // Hand the pad to the digital GPIO matrix before touching it. This matters
@@ -185,6 +213,8 @@ void dht_init(void)
     // resistor shows up as flaky readings rather than nothing at all.
     gpio_set_pull_mode(DHT_GPIO, GPIO_PULLUP_ONLY);
     gpio_set_direction(DHT_GPIO, GPIO_MODE_INPUT);
+
+    check_line();
 
     if (xTaskCreate(dht_task, "dht", TASK_STACK, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE(TAG, "could not start the sensor task");
