@@ -57,4 +57,17 @@ menu "WS2812B Clock Display"
         range 0 23
         default 6
 
+    config DISPLAY_CYCLE_SECONDS
+        int "Seconds per item on the centre display"
+        depends on DISPLAY_ALTERNATE_DATE
+        range 2 60
+        default 10
+        help
+            The plates rotate through time, date, temperature and humidity, or
+            just time and date when no sensor is fitted.
+
+            A value that divides 86400 by the full cycle length leaves no jump
+            at midnight: 10 seconds gives a 40 second cycle, and 86400 / 40 is
+            exact. Awkward values still work, they just step once a day.
+
 endmenu
