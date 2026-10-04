@@ -3127,16 +3127,6 @@
 	)
 	(wire
 		(pts
-			(xy 179.07 49.53) (xy 200.66 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "a1f63faa-28b9-4c1a-a403-b0f9599c1413")
-	)
-	(wire
-		(pts
 			(xy 210.82 29.21) (xy 189.23 29.21)
 		)
 		(stroke
@@ -3327,6 +3317,16 @@
 	)
 	(wire
 		(pts
+			(xy 173.99 49.53) (xy 200.66 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e1ea5e28-65e2-434b-8a05-4df96f84a826")
+	)
+	(wire
+		(pts
 			(xy 189.23 29.21) (xy 189.23 36.83)
 		)
 		(stroke
@@ -3508,86 +3508,6 @@
 			(project "Clock"
 				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
 					(reference "D1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R_Small")
-		(at 176.53 49.53 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "2c085423-1c79-45ca-9494-e80508eefa3b")
-		(property "Reference" "R3"
-			(at 176.53 44.45 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.016 1.016)
-				)
-			)
-		)
-		(property "Value" "10K Ohm"
-			(at 176.53 46.99 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 176.53 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 176.53 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Resistor, small symbol"
-			(at 176.53 49.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "b70e920f-869f-425a-bfb4-716c6132a83a")
-		)
-		(pin "2"
-			(uuid "2e6a90e1-1726-40f9-8b91-3c90eca8236a")
-		)
-		(instances
-			(project "Clock"
-				(path "/57d06451-c67b-46a4-abe3-bcdfd528483e"
-					(reference "R3")
 					(unit 1)
 				)
 			)
