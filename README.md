@@ -61,7 +61,8 @@ All under `idf.py menuconfig`:
 
 | Menu | Options |
 | --- | --- |
-| *WS2812B Clock Display* | Ring and digit GPIOs and pixel counts, day/night brightness for each, night window (default 19:00–06:00), time/date alternation |
+| *WS2812B Clock Display* | Ring and digit GPIOs and pixel counts, day/night brightness for each, night window (default 19:00–06:00), rotation and `DISPLAY_CYCLE_SECONDS` |
+| *WS2812B Clock Environment Sensor* | `DHT_ENABLE`, data GPIO, reading interval, retries |
 | *WS2812B Clock Wifi* | SSID, password, `WIFI_MAXIMUM_RETRY`, `WIFI_POWER_SAVE` (off: modem sleep costs OTA throughput and log latency for power a mains-powered clock does not need) |
 | *WS2812B Clock NTP* | Server (default `pool.ntp.org`), timezone (default Sydney), sync method |
 | *WS2812B Clock OTA* | Base URL, model directory, token, certificate source, check-at-boot and interval, `OTA_PROGRESS_STEP_PCT`, `OTA_UPLOAD_COREDUMP`, `OTA_CRASH_URL` |
@@ -246,6 +247,57 @@ at the one matching the target.
 
 Losing the signing key means signed clocks stop accepting updates and must be
 reflashed over USB. It lives in 1Password; keep that recoverable.
+
+## The centre display
+
+The two plates rotate through four readings, ten seconds each by default
+(`DISPLAY_CYCLE_SECONDS`):
+
+| Phase | Shows | Example |
+| --- | --- | --- |
+| Time | `HH MM` | `18 19` |
+| Date | `DD MM` | `01 10` |
+| Temperature | `NN °C` | `21 °C` |
+| Humidity | `NN rH` | `47 rH` |
+
+With no sensor fitted it rotates through time and date only.
+
+The phase comes from seconds since midnight rather than `tm_sec`, so it does not
+jump at the top of each minute. At the default ten seconds the full cycle is 40
+seconds and 86400 divides exactly by that, so midnight passes without a step
+either. Other values work, they just stutter once a day.
+
+A temperature or humidity the sensor has not supplied shows as dashes rather
+than a stale number. A sensor that has stopped answering should be visible on
+the clock face, not quietly skipped.
+
+## Environment sensor
+
+A DHT11 on a single data line, read every `DHT_INTERVAL_S` seconds (default 30).
+The part is specified to 1 °C and 1 % and updates about once a second at best,
+so there is nothing to gain from reading it more often.
+
+**The pin must be output capable.** The protocol is bidirectional on one wire:
+the host pulls the line low for about 20 ms to request a reading, then releases
+it and listens. **GPIO34–39 cannot be used** — they are input only on the ESP32,
+which is why `DHT_GPIO` stops at 33. The line idles high and needs an external
+4.7–10 kΩ pull-up to the sensor's supply; the internal pull-up is enabled as a
+backstop so a missing resistor shows up as flaky readings rather than silence.
+
+Keep its wire away from the two LED data runs.
+
+### Why it does not disable interrupts
+
+The timing is tight — a bit is a 50 µs low followed by roughly 27 µs of high for
+a zero or 70 µs for a one — and the usual way to read one of these is to mask
+interrupts for the whole 4 ms exchange. That would be the wrong trade here: it
+would disturb the RMT refills driving the LEDs and upset WiFi, and this build
+has had quite enough trouble with marginal LED timing already.
+
+Instead the driver times with `esp_timer_get_time()` and leaves interrupts
+alone. A read that gets preempted mid-bit fails the sensor's own checksum and is
+retried. At one reading every thirty seconds, retries are free, and the result
+is self-correcting rather than timing-fragile.
 
 ## Remote logging
 
@@ -457,6 +509,7 @@ components/
 ├── ntp/       SNTP, timezone, NTP_EVENT, ntp_time_is_valid()
 ├── wifi/      station mode, retries forever with back-off
 ├── ota/       manifest check, HTTPS update, rollback, crash dump upload
+├── dht/       DHT11 temperature and humidity, sampled in the background
 ├── fan/       LEDC PWM fan control with kick-start
 ├── logship/   syslog-over-UDP log shipping, crash reports on boot
 └── debug/     activity LED on serial traffic

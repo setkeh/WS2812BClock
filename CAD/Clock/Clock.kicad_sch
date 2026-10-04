@@ -2717,6 +2717,16 @@
 	)
 	(wire
 		(pts
+			(xy 168.91 77.47) (xy 184.15 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1bfcf0ed-5df3-4c28-857d-cb6502a6267d")
+	)
+	(wire
+		(pts
 			(xy 153.67 16.51) (xy 193.04 16.51)
 		)
 		(stroke
@@ -2837,16 +2847,6 @@
 	)
 	(wire
 		(pts
-			(xy 168.91 49.53) (xy 173.99 49.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4e829d94-cafb-4971-8f46-332c112ddf97")
-	)
-	(wire
-		(pts
 			(xy 219.71 52.07) (xy 242.57 52.07)
 		)
 		(stroke
@@ -2914,6 +2914,16 @@
 			(type default)
 		)
 		(uuid "5f92ca90-ca8e-44ee-b1bc-f5c6a22b812b")
+	)
+	(wire
+		(pts
+			(xy 184.15 57.15) (xy 184.15 77.47)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6500730b-6c02-4617-ab91-26b98ae62bbf")
 	)
 	(wire
 		(pts
@@ -3054,6 +3064,16 @@
 			(type default)
 		)
 		(uuid "92289417-9eff-42af-bc59-e18b035c10ad")
+	)
+	(wire
+		(pts
+			(xy 173.99 57.15) (xy 173.99 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "92cb5814-4fee-4589-a059-72677ec6e892")
 	)
 	(wire
 		(pts
@@ -3367,6 +3387,16 @@
 	)
 	(wire
 		(pts
+			(xy 173.99 74.93) (xy 173.99 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f2a2d343-7111-4053-9a58-158986ce85d4")
+	)
+	(wire
+		(pts
 			(xy 34.29 109.22) (xy 17.78 109.22)
 		)
 		(stroke
@@ -3387,13 +3417,13 @@
 	)
 	(wire
 		(pts
-			(xy 173.99 74.93) (xy 173.99 139.7)
+			(xy 184.15 57.15) (xy 173.99 57.15)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "fcd3c19d-5c98-4855-abed-e9d005785d7b")
+		(uuid "fe30a3c2-9963-401d-9b6e-22d1f8cc7bbd")
 	)
 	(symbol
 		(lib_id "LED:WS2812B")
@@ -3974,16 +4004,16 @@
 			)
 		)
 		(pin "1"
-			(uuid "fb51ecc8-6e7b-4a02-a674-000280e8b193")
+			(uuid "fb51ecc8-6e7b-4a02-a674-000280e8b194")
 		)
 		(pin "2"
-			(uuid "ecdecb67-66ea-47f2-9fff-b40bd596dc9c")
+			(uuid "ecdecb67-66ea-47f2-9fff-b40bd596dc9d")
 		)
 		(pin "4"
-			(uuid "63d0b14e-0ddd-459d-a15c-4d2fdd01eaec")
+			(uuid "63d0b14e-0ddd-459d-a15c-4d2fdd01eaed")
 		)
 		(pin "3"
-			(uuid "8ace9c1d-f389-4af9-b611-d625b21d68cd")
+			(uuid "8ace9c1d-f389-4af9-b611-d625b21d68ce")
 		)
 		(instances
 			(project "Clock"
@@ -4062,10 +4092,10 @@
 			)
 		)
 		(pin "1"
-			(uuid "a25ad48f-81dd-40f8-bd97-9e7f7be70f18")
+			(uuid "a25ad48f-81dd-40f8-bd97-9e7f7be70f19")
 		)
 		(pin "2"
-			(uuid "8b9cfe4f-718d-48d1-9272-a96875f9ee25")
+			(uuid "8b9cfe4f-718d-48d1-9272-a96875f9ee26")
 		)
 		(instances
 			(project "Clock"
@@ -4538,16 +4568,16 @@
 			)
 		)
 		(pin "3"
-			(uuid "c697e198-99d7-48f0-a36b-5db252f3262b")
+			(uuid "c697e198-99d7-48f0-a36b-5db252f3262c")
 		)
 		(pin "4"
-			(uuid "f9edc1c3-008a-4b83-9fcb-0cf953e496ec")
+			(uuid "f9edc1c3-008a-4b83-9fcb-0cf953e496ed")
 		)
 		(pin "2"
-			(uuid "ede42d6d-a68c-408e-af67-2473f6bff8a6")
+			(uuid "ede42d6d-a68c-408e-af67-2473f6bff8a7")
 		)
 		(pin "1"
-			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef1437f")
+			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef14380")
 		)
 		(instances
 			(project "Clock"
@@ -4626,13 +4656,13 @@
 			)
 		)
 		(pin "1"
-			(uuid "12beec24-3a7d-4418-856f-59a77e151568")
+			(uuid "12beec24-3a7d-4418-856f-59a77e151569")
 		)
 		(pin "2"
-			(uuid "05ae0cb2-3b89-40fc-b38f-4f2728918745")
+			(uuid "05ae0cb2-3b89-40fc-b38f-4f2728918746")
 		)
 		(pin "3"
-			(uuid "698d7ff8-6b05-4622-b851-9742f258e1e1")
+			(uuid "698d7ff8-6b05-4622-b851-9742f258e1e2")
 		)
 		(instances
 			(project "Clock"
@@ -4711,16 +4741,16 @@
 			)
 		)
 		(pin "3"
-			(uuid "c697e198-99d7-48f0-a36b-5db252f3262b")
+			(uuid "c697e198-99d7-48f0-a36b-5db252f3262d")
 		)
 		(pin "4"
-			(uuid "f9edc1c3-008a-4b83-9fcb-0cf953e496ec")
+			(uuid "f9edc1c3-008a-4b83-9fcb-0cf953e496ee")
 		)
 		(pin "2"
-			(uuid "ede42d6d-a68c-408e-af67-2473f6bff8a6")
+			(uuid "ede42d6d-a68c-408e-af67-2473f6bff8a8")
 		)
 		(pin "1"
-			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef1437f")
+			(uuid "9b5c7a74-6d2a-4505-b4a3-bf37bef14381")
 		)
 		(instances
 			(project "Clock"

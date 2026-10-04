@@ -6,6 +6,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "led_strip.h"
+#include "dht.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "display";
@@ -47,6 +48,16 @@ static const uint8_t font[10] = {
     0x7F, // 8: abcdefg
     0x6F, // 9: abcdfg
 };
+
+enum { PHASE_TIME, PHASE_DATE, PHASE_TEMPERATURE, PHASE_HUMIDITY, PHASE_COUNT };
+
+// Glyphs that are not digits, in the same bit order: bit 0 = a ... bit 6 = g.
+#define GLYPH_BLANK  0x00
+#define GLYPH_DASH   0x40   // g
+#define GLYPH_DEGREE 0x63   // a b f g -- the small ring at the top
+#define GLYPH_C      0x39   // a d e f
+#define GLYPH_H      0x76   // b c e f g
+#define GLYPH_R      0x50   // e g
 
 typedef struct { uint8_t r, g, b; } rgb_t;
 
@@ -151,9 +162,8 @@ static void ring_flush(const rgb_t *buf)
     ESP_ERROR_CHECK(led_strip_refresh(s_ring));
 }
 
-static void draw_digit(int digit, int value, int percent)
+static void draw_glyph(int digit, uint8_t bits, int percent)
 {
-    uint8_t bits = font[value % 10];
     for (int letter = 0; letter < 7; letter++) {
         bool on = bits & (1 << letter);
         rgb_t c = on ? COLOUR_DIGIT : (rgb_t){ 0, 0, 0 };
@@ -162,6 +172,21 @@ static void draw_digit(int digit, int value, int percent)
                                             scale(c.g, percent),
                                             scale(c.b, percent)));
     }
+}
+
+static void draw_digit(int digit, int value, int percent)
+{
+    draw_glyph(digit, font[value % 10], percent);
+}
+
+// A two-digit value across one plate, leading zero kept so the display does
+// not change width as the value crosses ten.
+static void draw_pair(int first_digit, int value, int percent)
+{
+    if (value < 0) value = 0;
+    if (value > 99) value = 99;
+    draw_digit(first_digit, value / 10, percent);
+    draw_digit(first_digit + 1, value % 10, percent);
 }
 
 void display_show_time(const struct tm *local)
@@ -188,19 +213,48 @@ void display_show_time(const struct tm *local)
     ring_set(ring, hour_pos, COLOUR_HOUR, percent);
     ring_flush(ring);
 
-    // First half of each minute shows the time, second half the date.
+    // The plates rotate through time, date, temperature and humidity. The phase
+    // comes from seconds since midnight rather than tm_sec, so it does not jump
+    // at the top of each minute; 86400 divides exactly by the full cycle at the
+    // default interval, so midnight is seamless too.
+    int phase = PHASE_TIME;
 #if CONFIG_DISPLAY_ALTERNATE_DATE
-    bool show_date = local->tm_sec >= 30;
-#else
-    bool show_date = false;
+    int secs_of_day = local->tm_hour * 3600 + local->tm_min * 60 + local->tm_sec;
+    int phases = dht_enabled() ? PHASE_COUNT : PHASE_DATE + 1;
+    phase = (secs_of_day / CONFIG_DISPLAY_CYCLE_SECONDS) % phases;
 #endif
-    int left = show_date ? local->tm_mday : local->tm_hour;
-    int right = show_date ? local->tm_mon + 1 : local->tm_min;
 
-    draw_digit(0, left / 10, seg_percent);    // DD / HH
-    draw_digit(1, left % 10, seg_percent);
-    draw_digit(2, right / 10, seg_percent);   // MM / MM
-    draw_digit(3, right % 10, seg_percent);
+    int temperature = 0, humidity = 0;
+    bool have_reading = dht_read(&temperature, &humidity);
+
+    switch (phase) {
+    case PHASE_DATE:
+        draw_pair(0, local->tm_mday, seg_percent);
+        draw_pair(2, local->tm_mon + 1, seg_percent);
+        break;
+
+    case PHASE_TEMPERATURE:
+        // Dashes rather than a stale or invented number: a sensor that has
+        // stopped answering should be visible, not silently skipped.
+        if (have_reading) draw_pair(0, temperature, seg_percent);
+        else { draw_glyph(0, GLYPH_DASH, seg_percent); draw_glyph(1, GLYPH_DASH, seg_percent); }
+        draw_glyph(2, GLYPH_DEGREE, seg_percent);
+        draw_glyph(3, GLYPH_C, seg_percent);
+        break;
+
+    case PHASE_HUMIDITY:
+        if (have_reading) draw_pair(0, humidity, seg_percent);
+        else { draw_glyph(0, GLYPH_DASH, seg_percent); draw_glyph(1, GLYPH_DASH, seg_percent); }
+        draw_glyph(2, GLYPH_R, seg_percent);     // rH, relative humidity
+        draw_glyph(3, GLYPH_H, seg_percent);
+        break;
+
+    default:
+        draw_pair(0, local->tm_hour, seg_percent);
+        draw_pair(2, local->tm_min, seg_percent);
+        break;
+    }
+
     ESP_ERROR_CHECK(led_strip_refresh(s_seg));
 }
 
@@ -215,12 +269,8 @@ void display_show_waiting(void)
         ring_set(ring, h * 5, COLOUR_MARK, percent);
     ring_flush(ring);
 
-    // Four dashes: middle segment only.
-    ESP_ERROR_CHECK(led_strip_clear(s_seg));
+    // Four dashes.
     for (int digit = 0; digit < 4; digit++)
-        ESP_ERROR_CHECK(led_strip_set_pixel(s_seg, s_seg_pixel[digit][6],
-                                            scale(COLOUR_DIGIT.r, CONFIG_DISPLAY_SEG_NIGHT_BRIGHTNESS),
-                                            scale(COLOUR_DIGIT.g, CONFIG_DISPLAY_SEG_NIGHT_BRIGHTNESS),
-                                            scale(COLOUR_DIGIT.b, CONFIG_DISPLAY_SEG_NIGHT_BRIGHTNESS)));
+        draw_glyph(digit, GLYPH_DASH, CONFIG_DISPLAY_SEG_NIGHT_BRIGHTNESS);
     ESP_ERROR_CHECK(led_strip_refresh(s_seg));
 }

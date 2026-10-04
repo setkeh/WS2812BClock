@@ -17,6 +17,7 @@
 #include "display.h"
 #include "ota.h"
 #include "logship.h"
+#include "dht.h"
 
 #include "nvs_flash.h"
 
@@ -94,6 +95,9 @@ void app_main(void) {
 
     ESP_ERROR_CHECK(display_init());
     display_show_waiting();
+
+    // Samples in the background; the display reads whatever it last managed.
+    dht_init();
 
     if (!wifi_init_sta()) {
         ESP_LOGW(TAG, "WiFi not up yet, will keep retrying in the background");

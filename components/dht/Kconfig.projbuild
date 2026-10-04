@@ -1,0 +1,41 @@
+menu "WS2812B Clock Environment Sensor"
+
+    config DHT_ENABLE
+        bool "DHT11 temperature and humidity sensor"
+        default n
+
+    config DHT_GPIO
+        int "DHT11 data GPIO"
+        depends on DHT_ENABLE
+        range 0 33
+        default 33
+        help
+            Must be output capable. The sensor's single-wire protocol needs the
+            host to pull the line low to request a reading, so GPIO34-39 cannot
+            be used -- they are input only on the ESP32, which is why the range
+            here stops at 33.
+
+            The line idles high and needs an external 4.7k-10k pull-up to the
+            sensor's supply. Keep it away from the LED data runs.
+
+    config DHT_INTERVAL_S
+        int "Seconds between readings"
+        depends on DHT_ENABLE
+        range 2 3600
+        default 30
+        help
+            A DHT11 updates roughly once a second at best and is specified to
+            1 degree and 1 percent, so there is nothing to gain from reading it
+            often. Room temperature does not move quickly.
+
+    config DHT_RETRIES
+        int "Attempts per reading"
+        depends on DHT_ENABLE
+        range 1 5
+        default 3
+        help
+            A read that is interrupted mid-bit fails its checksum and is simply
+            tried again, which is what makes this safe without masking
+            interrupts.
+
+endmenu
